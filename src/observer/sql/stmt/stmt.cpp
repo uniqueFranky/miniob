@@ -107,7 +107,10 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
     case SCF_CALC: {
       return CalcStmt::create(sql_node.calc, stmt);
     }
-
+    case SCF_DROP_TABLE: {
+      LOG_INFO("Command::type %d doesn't need to create statement.", sql_node.flag);
+      return RC::SUCCESS;
+    }
     default: {
       LOG_INFO("Command::type %d doesn't need to create statement.", sql_node.flag);
     } break;

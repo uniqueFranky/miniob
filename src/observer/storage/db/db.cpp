@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include "storage/clog/disk_log_handler.h"
 #include "storage/clog/integrated_log_replayer.h"
+#include "storage/index/index.h"
 
 using namespace common;
 
@@ -158,6 +159,50 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
 
   opened_tables_[table_name] = table;
   LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
+  return RC::SUCCESS;
+}
+
+RC Db::drop_table(const char *table_name) {
+  if(opened_tables_.count(table_name) == 0) {
+    LOG_TRACE("Trying to delete table %s which not exists.", table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  // 删除元数据
+  string table_meta_path = table_meta_file(path_.c_str(), table_name);
+  if(filesystem::exists(table_meta_path)) {
+    filesystem::remove(table_meta_path);
+    LOG_TRACE("Removed metadata for table %s.", table_name);
+  } else {
+    LOG_TRACE("Metadata for table %s not exists.", table_name);
+  }
+
+  // 删除数据
+  string table_data_path = table_data_file(path_.c_str(), table_name);
+  if(filesystem::exists(table_data_path)) {
+    filesystem::remove(table_data_path);
+    LOG_TRACE("Removed data for table %s.", table_name);
+  } else {
+    LOG_TRACE("Data for table %s not exists.", table_name);
+  }
+
+  // 删除索引
+  Table *table = opened_tables_[table_name];
+  for(const auto &field: *table->table_meta().field_metas()) { // 遍历所有可能的字段
+    Index *idx = table->find_index_by_field(field.name());
+    if(idx != nullptr) {
+      string table_index_path = table_index_file(path_.c_str(), table_name, idx->index_meta().name());
+      if(filesystem::exists(table_index_path)) {
+        filesystem::remove(table_index_path);
+        LOG_TRACE("Removed index for table %s on field %s.", table_name, idx->index_meta().name());
+      }
+    }
+  }
+
+  // 删除内存中已经打开的表
+  delete table;
+  opened_tables_.erase(table_name);
+
   return RC::SUCCESS;
 }
 

@@ -25,6 +25,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/stmt.h"
 #include "storage/default/default_handler.h"
+#include "session/session.h"
 
 using namespace std;
 using namespace common;
@@ -46,7 +47,12 @@ RC ExecuteStage::handle_request(SQLStageEvent *sql_event)
     rc = command_executor.execute(sql_event);
     session_event->sql_result()->set_return_code(rc);
   } else {
-    return RC::INTERNAL;
+    switch(sql_event->sql_node()->flag) {
+      case SCF_DROP_TABLE:
+        return session_event->session()->get_current_db()->drop_table(sql_event->sql_node()->drop_table.relation_name.c_str());
+      default:
+        return RC::INTERNAL;
+    }
   }
   return rc;
 }
