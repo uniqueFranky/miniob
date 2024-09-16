@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/sstream.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include "common/type/date_type.h"
 
 Value::Value(int val) { set_int(val); }
 
@@ -27,6 +28,8 @@ Value::Value(float val) { set_float(val); }
 Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
+
+Value::Value(const Date_t &date) {set_date(date); }
 
 Value::Value(const Value &other)
 {
@@ -125,6 +128,10 @@ void Value::set_data(char *data, int length)
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
     } break;
+    case AttrType::DATES: {
+      value_.date_value_ = *(Date_t *)data;
+      length_ = length;
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -174,6 +181,13 @@ void Value::set_string(const char *s, int len /*= 0*/)
     value_.pointer_value_[len] = '\0';
   }
 }
+void Value::set_date(const Date_t &val)
+{
+  reset();
+  attr_type_         = AttrType::DATES;
+  value_.date_value_ = val;
+  length_            = sizeof(val);
+}
 
 void Value::set_value(const Value &value)
 {
@@ -189,6 +203,9 @@ void Value::set_value(const Value &value)
     } break;
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
+    } break;
+    case AttrType::DATES: {
+      set_date(value.get_date());
     } break;
     default: {
       ASSERT(false, "got an invalid value type");
@@ -326,4 +343,20 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+Date_t Value::get_date() const
+{
+  switch(attr_type_) {
+    case AttrType::DATES: {
+      return value_.date_value_;
+    } break;
+    case AttrType::CHARS: {
+      return Date_t::parse_date_from_string(value_.pointer_value_);
+    } break;
+    default: {
+      LOG_WARN("Unexpected type when getting date.");
+      return Date_t();
+    }
+  }
 }

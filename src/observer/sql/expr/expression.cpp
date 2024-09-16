@@ -178,6 +178,7 @@ RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
   Value right_value;
 
   RC rc = left_->get_value(tuple, left_value);
+  LOG_INFO("%d", left_->type());
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;

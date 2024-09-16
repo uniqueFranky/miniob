@@ -16,8 +16,18 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
   if(values_[0].attr_type() != field_meta->type()) { // 类型必须匹配
-    LOG_WARN("Field type not match.");
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    // 尝试进行类型转换
+    if(DataType::type_instance(field_meta->type())->cast_cost(values_[0].attr_type())!= INT32_MAX) {
+      RC rc = Value::cast_to(values_[0], field_meta->type(), values_[0]);
+      if(OB_FAIL(rc)) {
+        LOG_WARN("Failed to convert type %d to %d.", values_[0].attr_type(), field_meta->type());
+        return rc;
+      }
+    } else {
+      LOG_WARN("Field type not match.");
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
   }
 
   // 打开子算子，即 predicate 或table get
