@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include "sql/operator/update_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -33,6 +34,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
+#include "sql/stmt/update_stmt.h"
 #include "sql/stmt/stmt.h"
 
 #include "sql/expr/expression_iterator.h"
@@ -73,6 +75,13 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
 
       rc = create_plan(explain_stmt, logical_operator);
     } break;
+
+    case StmtType::UPDATE: {
+      UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
+
+      rc = create_plan(update_stmt, logical_operator);
+    } break;
+
     default: {
       rc = RC::UNIMPLEMENTED;
     }
@@ -276,6 +285,32 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   logical_operator = unique_ptr<LogicalOperator>(new ExplainLogicalOperator);
   logical_operator->add_child(std::move(child_oper));
   return rc;
+}
+
+RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<LogicalOperator> &logical_operator)
+{
+  // filter
+  unique_ptr<LogicalOperator> predicate_operator;
+  RC rc = create_plan(update_stmt->filter_stmt(), predicate_operator);
+  if(rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // fetch
+  unique_ptr<LogicalOperator> table_get_operator(new TableGetLogicalOperator(update_stmt->table(), ReadWriteMode::READ_WRITE));
+
+  // compose to make an update logical operator
+  unique_ptr<LogicalOperator> update_operator(new UpdateLogicalOperator(update_stmt->table(),
+      update_stmt->attribute_name(), update_stmt->values(), update_stmt->value_amount()));
+  if(predicate_operator) { // has a "where" clause
+    predicate_operator->add_child(std::move(table_get_operator));
+    update_operator->add_child(std::move(predicate_operator));
+  } else { // no "where" clause
+    update_operator->add_child(std::move(table_get_operator));
+  }
+  logical_operator = std::move(update_operator);
+
+  return RC::SUCCESS;
 }
 
 RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)

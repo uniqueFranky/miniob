@@ -43,6 +43,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/scalar_group_by_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/operator/update_logical_operator.h"
+#include "sql/operator/update_physical_operator.h"
 
 using namespace std;
 
@@ -85,6 +87,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::GROUP_BY: {
       return create_plan(static_cast<GroupByLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::UPDATE: {
+      return create_plan(static_cast<UpdateLogicalOperator &>(logical_operator), oper);
     } break;
 
     default: {
@@ -403,6 +409,22 @@ RC PhysicalPlanGenerator::create_vec_plan(GroupByLogicalOperator &logical_oper, 
   return rc;
 
   return RC::SUCCESS;
+}
+
+RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper)
+{
+  unique_ptr<UpdatePhysicalOperator> update_physical_operator(new UpdatePhysicalOperator(logical_oper.table(), logical_oper.attribute_name(), logical_oper.values(), logical_oper.value_amount()));
+  // 创建子算子，在有where clause时子算子是一个predicate，否则是一个table get
+  ASSERT(logical_oper.children().size() == 1, "UpdateLogicalOperator must exactly have 1 child");
+  unique_ptr<PhysicalOperator> child_operator;
+  RC rc = create(*logical_oper.children()[0], child_operator);
+  if(OB_FAIL(rc)) {
+    LOG_WARN("Failed to create child physical operator for UpdatePhysicalOperator.");
+    return rc;
+  }
+  update_physical_operator->add_child(std::move(child_operator));
+  oper = std::move(update_physical_operator);
+  return rc;
 }
 
 RC PhysicalPlanGenerator::create_vec_plan(ProjectLogicalOperator &project_oper, unique_ptr<PhysicalOperator> &oper)
