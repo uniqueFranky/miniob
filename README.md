@@ -13,6 +13,15 @@ MiniOB 是 [OceanBase](https://github.com/oceanbase/oceanbase) 团队基于华�
 
 MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题目，帮助同学们从零基础入门，迅速了解数据库并深入学习数据库内核。MiniOB 简化了许多模块，例如不考虑并发操作、安全特性和复杂的事务管理等功能，以便更好地学习数据库实现原理。我们期望通过 MiniOB 的训练，同学们能够熟练掌握数据库内核模块的功能和协同关系，并具备一定的工程编码能力，例如内存管理、网络通信和磁盘 I/O 处理等, 这将有助于同学在未来的面试和工作中脱颖而出。
 
+# Timeline
+
+|Assignment|Score|Pass Time|Commit ID|
+|----------|-----|---------|---------|
+|drop-table|10|2024-09-14 18:43|4d95f5649cb680e97709e7d250a7c1f2b978f1ab|
+|update|10|2024-09-16 11:39|8ae210f8a59924fa90319d930e351ffb46879b0d|
+
+
+
 # [文档](https://oceanbase.github.io/miniob/)
 代码配套设计文档和相关代码注释已经生成文档，并通过 GitHub Pages 发布。您可以直接访问：[MiniOB GitHub Pages](https://oceanbase.github.io/miniob/).
 
