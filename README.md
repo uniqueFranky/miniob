@@ -15,10 +15,10 @@ MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题�
 
 # Timeline
 
-|Assignment|Score|Pass Time|Commit ID|
-|----------|-----|---------|---------|
-|drop-table|10|2024-09-14 18:43|4d95f5649cb680e97709e7d250a7c1f2b978f1ab|
-|update|10|2024-09-16 11:39|8ae210f8a59924fa90319d930e351ffb46879b0d|
+|Assignment|Score|Pass Time| Keywords                         |Commit ID|
+|----------|-----|---------|----------------------------------|---------|
+|drop-table|10|2024-09-14 18:43| Table Meta Data                  | 4d95f5649cb680e97709e7d250a7c1f2b978f1ab  |
+|update|10|2024-09-16 11:39| Logical/Physical Plan Generating | 8ae210f8a59924fa90319d930e351ffb46879b0d |
 
 
 
