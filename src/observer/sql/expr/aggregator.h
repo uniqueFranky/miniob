@@ -35,3 +35,33 @@ public:
   RC accumulate(const Value &value) override;
   RC evaluate(Value &result) override;
 };
+
+class CountAggregator: public Aggregator {
+public:
+  CountAggregator() { value_ = Value(0); }
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+};
+
+class AvgAggregator: public Aggregator {
+public:
+  AvgAggregator() { sum_aggregator_ = make_unique<SumAggregator>(); count_aggregator_ = make_unique<CountAggregator>();}
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+
+private:
+  unique_ptr<SumAggregator> sum_aggregator_;
+  unique_ptr<CountAggregator> count_aggregator_;
+};
+
+class MaxAggregator: public Aggregator {
+public:
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+};
+
+class MinAggregator: public Aggregator {
+public:
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+};

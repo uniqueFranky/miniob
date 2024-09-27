@@ -155,6 +155,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <relation_list>       rel_list
+%type <string>              aggregate_name
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -503,6 +504,11 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+
+aggregate_name:
+    ID { $$ = $1; }
+    ;
+
 expression:
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
@@ -538,6 +544,15 @@ expression:
       $$ = new StarExpr();
     }
     // your code here
+    | aggregate_name LBRACE expression RBRACE {
+        $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    | aggregate_name LBRACE expression COMMA expression_list RBRACE { // invalid
+        $$ = create_aggregate_expression($1, nullptr, sql_string, &@$);
+    }
+    | aggregate_name LBRACE RBRACE { // invalid
+        $$ = create_aggregate_expression($1, nullptr, sql_string, &@$);
+    }
     ;
 
 rel_attr:

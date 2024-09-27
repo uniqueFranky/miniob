@@ -420,6 +420,10 @@ RC ExpressionBinder::bind_aggregate_expression(
   unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->child();
   vector<unique_ptr<Expression>> child_bound_expressions;
 
+  if(!child_expr) { // invalid expressions like sum() or sum(a, b)
+    return RC::INVALID_ARGUMENT;
+  }
+
   if (child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
     ValueExpr *value_expr = new ValueExpr(Value(1));
     child_expr.reset(value_expr);
