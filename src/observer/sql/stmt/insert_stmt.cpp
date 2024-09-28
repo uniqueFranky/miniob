@@ -13,20 +13,22 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/insert_stmt.h"
+
+#include <utility>
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
-InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
-    : table_(table), values_(values), value_amount_(value_amount)
+InsertStmt::InsertStmt(Table *table, vector<vector<Value>> items)
+    : table_(table), items_(std::move(items))
 {}
 
-RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
+RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 {
   const char *table_name = inserts.relation_name.c_str();
-  if (nullptr == db || nullptr == table_name || inserts.values.empty()) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p, value_num=%d",
-        db, table_name, static_cast<int>(inserts.values.size()));
+  if (nullptr == db || nullptr == table_name || inserts.items.empty()) {
+    LOG_WARN("invalid argument. db=%p, table_name=%p, item_num=%d",
+        db, table_name, static_cast<int>(inserts.items.size()));
     return RC::INVALID_ARGUMENT;
   }
 
@@ -38,16 +40,16 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   // check the fields number
-  const Value     *values     = inserts.values.data();
-  const int        value_num  = static_cast<int>(inserts.values.size());
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
-  if (field_num != value_num) {
-    LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
-    return RC::SCHEMA_FIELD_MISSING;
+  for(const vector<Value> &item: inserts.items) {
+    int value_num = static_cast<int>(item.size());
+    if(field_num != value_num) {
+      LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
   }
-
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, std::move(inserts.items));
   return RC::SUCCESS;
 }

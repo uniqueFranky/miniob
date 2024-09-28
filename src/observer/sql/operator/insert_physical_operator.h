@@ -27,7 +27,7 @@ class InsertStmt;
 class InsertPhysicalOperator : public PhysicalOperator
 {
 public:
-  InsertPhysicalOperator(Table *table, std::vector<Value> &&values);
+  InsertPhysicalOperator(Table *table, std::vector<std::vector<Value>> &&items);
 
   virtual ~InsertPhysicalOperator() = default;
 
@@ -41,5 +41,5 @@ public:
 
 private:
   Table             *table_ = nullptr;
-  std::vector<Value> values_;
+  std::vector<std::vector<Value>> items_;
 };

@@ -126,6 +126,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Expression *                               expression;
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
+  std::vector<std::vector<Value>> *          insert_item_list;
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<std::string> *                 relation_list;
@@ -161,6 +162,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression_list>     group_by
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
+%type <value_list>          insert_item
+%type <insert_item_list>    insert_item_list
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
 %type <sql_node>            delete_stmt
@@ -369,18 +372,50 @@ type:
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     ;
+
+insert_item:
+    LBRACE value value_list RBRACE
+    {
+        $$ = new std::vector<Value>();
+        if($3 != nullptr) {
+            $$->swap(*$3);
+            delete $3;
+        }
+        $$->emplace_back(*$2);
+        delete $2;
+        std::reverse($$->begin(), $$->end());
+    }
+    ;
+
+insert_item_list:
+    // EMPTY
+    {
+        $$ = nullptr;
+    }
+    | COMMA insert_item insert_item_list
+    {
+        if($3 != nullptr) {
+            $$ = $3;
+        } else {
+            $$ = new std::vector<std::vector<Value>>();
+        }
+        $$->emplace_back(*$2);
+        delete $2;
+    }
+    ;
+
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES insert_item insert_item_list
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($7 != nullptr) {
-        $$->insertion.values.swap(*$7);
-        delete $7;
+      if ($6 != nullptr) {
+        $$->insertion.items.swap(*$6);
+        delete $6;
       }
-      $$->insertion.values.emplace_back(*$6);
-      std::reverse($$->insertion.values.begin(), $$->insertion.values.end());
-      delete $6;
+      $$->insertion.items.emplace_back(*$5);
+      delete $5;
+      std::reverse($$->insertion.items.begin(), $$->insertion.items.end());
       free($3);
     }
     ;
