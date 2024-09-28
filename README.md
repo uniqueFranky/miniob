@@ -21,6 +21,7 @@ MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题�
 | update           |10|2024-09-16 11:39| Logical/Physical Plan Generating | 8ae210f8a59924fa90319d930e351ffb46879b0d |
 | date             |10|2024-09-16 17:07| Parsing, Type Converting         | 6ae90c5e41028671d31620240f9191eb7c0b67a0|
 | aggregation-func |10|2024-09-28 00:49| Parsing, Error Handling          | 4fbac94192ec7743fc062de00b4a48b726bb7dd4|
+| insert           |10|2024-09-28 17:46| Parsing, Logical/Physical Plan Generating          | 8db8d4115778219fefee37956d8cc8ee64944f62|
 
 
 # [文档](https://oceanbase.github.io/miniob/)
