@@ -25,12 +25,15 @@ static const Json::StaticString FIELD_TABLE_NAME("table_name");
 static const Json::StaticString FIELD_STORAGE_FORMAT("storage_format");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
+static const Json::StaticString FIELD_UNIQUE_INDEXES("unique_indexes");
 
+// here construction function has to be updated
 TableMeta::TableMeta(const TableMeta &other)
     : table_id_(other.table_id_),
       name_(other.name_),
       fields_(other.fields_),
       indexes_(other.indexes_),
+      unique_indexes_(other.unique_indexes_),
       storage_format_(other.storage_format_),
       record_size_(other.record_size_)
 {}
@@ -40,6 +43,7 @@ void TableMeta::swap(TableMeta &other) noexcept
   name_.swap(other.name_);
   fields_.swap(other.fields_);
   indexes_.swap(other.indexes_);
+  unique_indexes_.swap(other.unique_indexes_);
   std::swap(record_size_, other.record_size_);
 }
 
@@ -101,6 +105,10 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
 RC TableMeta::add_index(const IndexMeta &index)
 {
   indexes_.push_back(index);
+  if(index.type() == IndexMeta::IndexType::Unique) {
+    LOG_INFO("adding a unique index into table meta\n");
+    unique_indexes_.push_back(index);
+  }
   return RC::SUCCESS;
 }
 
@@ -164,6 +172,10 @@ const IndexMeta *TableMeta::index(int i) const { return &indexes_[i]; }
 
 int TableMeta::index_num() const { return indexes_.size(); }
 
+const IndexMeta *TableMeta::unique_index(int i) const { return &unique_indexes_[i]; }
+
+int TableMeta::unique_index_num() const { return unique_indexes_.size(); }
+
 int TableMeta::record_size() const { return record_size_; }
 
 int TableMeta::serialize(std::ostream &ss) const
@@ -189,6 +201,14 @@ int TableMeta::serialize(std::ostream &ss) const
     indexes_value.append(std::move(index_value));
   }
   table_value[FIELD_INDEXES] = std::move(indexes_value);
+
+  Json::Value unique_indexes_value;
+  for(const IndexMeta &index: unique_indexes_) {
+    Json::Value index_value;
+    index.to_json(index_value);
+    unique_indexes_value.append(std::move(index_value));
+  }
+  table_value[FIELD_UNIQUE_INDEXES] = std::move(unique_indexes_value);
 
   Json::StreamWriterBuilder builder;
   Json::StreamWriter       *writer = builder.newStreamWriter();
@@ -292,6 +312,27 @@ int TableMeta::deserialize(std::istream &is)
       }
     }
     indexes_.swap(indexes);
+  }
+
+  const Json::Value &unique_indexes_value = table_value[FIELD_UNIQUE_INDEXES];
+  if(!unique_indexes_value.empty()) {
+    if(!unique_indexes_value.isArray()) {
+      LOG_ERROR("Invalid table meta. unique indexes is not array, json value=%s", fields_value.toStyledString().c_str());
+      return -1;
+    }
+    const int index_num = unique_indexes_value.size();
+    std::vector<IndexMeta> unique_indexes(index_num);
+    for(int i = 0; i < index_num; i++) {
+      IndexMeta &index = unique_indexes[i];
+
+      const Json::Value &index_value = unique_indexes_value[i];
+      rc = IndexMeta::from_json(*this, index_value, index);
+      if(OB_FAIL(rc)) {
+        LOG_ERROR("Failed to deserialize table meta. table name=%s", table_name.c_str());
+        return -1;
+      }
+    }
+    unique_indexes_.swap(unique_indexes);
   }
 
   return (int)(is.tellg() - old_pos);

@@ -62,6 +62,9 @@ public:
   const IndexMeta *index(int i) const;
   int              index_num() const;
 
+  const IndexMeta *unique_index(int i) const;
+  int              unique_index_num() const;
+
   int record_size() const;
 
 public:
@@ -77,6 +80,7 @@ protected:
   std::vector<FieldMeta> trx_fields_;
   std::vector<FieldMeta> fields_;  // 包含sys_fields
   std::vector<IndexMeta> indexes_;
+  std::vector<IndexMeta> unique_indexes_; // 由 create unique index 创建的index，同时保存在 indexes_ 中
   StorageFormat          storage_format_;
 
   int record_size_ = 0;

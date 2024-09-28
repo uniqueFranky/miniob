@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/insert_stmt.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
+#include "storage/index/index.h"
 
 using namespace std;
 
@@ -33,6 +34,23 @@ RC InsertPhysicalOperator::open(Trx *trx)
     if(OB_FAIL(rc)) {
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
+    }
+
+    // check for uniqueness
+    // fixme: currently omitting the duplicate keys in the same insert statement
+    for(int i = 0; i < table_->table_meta().unique_index_num(); i++) {
+      const IndexMeta *unique_index_meta = table_->table_meta().unique_index(i);
+      Index *unique_index = table_->find_index(unique_index_meta->name());
+      list<RID> rids;
+      rc = unique_index->get_entry(record.data(), rids);
+      if(OB_FAIL(rc)) {
+        LOG_WARN("failed to look up for record when inserting into table with unique index. rc=%s", strrc(rc));
+        return rc;
+      }
+      if(!rids.empty()) {
+        LOG_WARN("inserting duplicate keys into a table with unique index.");
+        return RC::INVALID_ARGUMENT;
+      }
     }
     // make sure every item is valid
     records.emplace_back(std::move(record));

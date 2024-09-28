@@ -59,6 +59,14 @@ public:
   virtual RC delete_entry(const char *record, const RID *rid) = 0;
 
   /**
+   * @brief 查找record中和key匹配的数据
+   *
+   * @param record 查找的记录，只使用key字段
+   * @param[in] rids   符合条件的记录的位置
+   */
+  virtual RC get_entry(const char *record, list<RID> &rids) = 0;
+
+  /**
    * @brief 创建一个索引数据的扫描器
    *
    * @param left_key 要扫描的左边界

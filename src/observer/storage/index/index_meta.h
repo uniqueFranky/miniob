@@ -33,13 +33,20 @@ class Value;
 class IndexMeta
 {
 public:
+  enum IndexType {
+    Normal,
+    Unique
+  };
+
+public:
   IndexMeta() = default;
 
-  RC init(const char *name, const FieldMeta &field);
+  RC init(const char *name, const FieldMeta &field, IndexType type);
 
 public:
   const char *name() const;
   const char *field() const;
+  IndexType type() const;
 
   void desc(ostream &os) const;
 
@@ -50,4 +57,5 @@ public:
 protected:
   string name_;   // index's name
   string field_;  // field's name
+  IndexType type_; // field's type
 };

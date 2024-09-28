@@ -353,7 +353,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
+RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name, IndexMeta::IndexType index_type)
 {
   if (common::is_blank(index_name) || nullptr == field_meta) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -362,7 +362,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, *field_meta, index_type);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
              name(), index_name, field_meta->name());
@@ -391,13 +391,27 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
+    if(index_type == IndexMeta::IndexType::Unique) {
+      list<RID> existing;
+      rc = index->get_entry(record.data(), existing);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to search for record using index while creating unique index. table=%s, index=%s, rc=%s",
+           name(), index_name, strrc(rc));
+        return rc;
+      }
+      if(!existing.empty()) {
+        LOG_WARN("unique index must not have same keys");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
     rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
-               name(), index_name, strrc(rc));
+           name(), index_name, strrc(rc));
       return rc;
     }
   }
+
   if (RC::RECORD_EOF == rc) {
     rc = RC::SUCCESS;
   } else {

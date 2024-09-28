@@ -21,8 +21,9 @@ See the Mulan PSL v2 for more details. */
 
 const static Json::StaticString FIELD_NAME("name");
 const static Json::StaticString FIELD_FIELD_NAME("field_name");
+const static Json::StaticString FIELD_TYPE("type");
 
-RC IndexMeta::init(const char *name, const FieldMeta &field)
+RC IndexMeta::init(const char *name, const FieldMeta &field, IndexMeta::IndexType type)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
@@ -31,6 +32,7 @@ RC IndexMeta::init(const char *name, const FieldMeta &field)
 
   name_  = name;
   field_ = field.name();
+  type_ = type;
   return RC::SUCCESS;
 }
 
@@ -38,12 +40,14 @@ void IndexMeta::to_json(Json::Value &json_value) const
 {
   json_value[FIELD_NAME]       = name_;
   json_value[FIELD_FIELD_NAME] = field_;
+  json_value[FIELD_TYPE] = static_cast<int>(type_);
 }
 
 RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index)
 {
   const Json::Value &name_value  = json_value[FIELD_NAME];
   const Json::Value &field_value = json_value[FIELD_FIELD_NAME];
+  const Json::Value &type_value = json_value[FIELD_TYPE];
   if (!name_value.isString()) {
     LOG_ERROR("Index name is not a string. json value=%s", name_value.toStyledString().c_str());
     return RC::INTERNAL;
@@ -55,17 +59,25 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
     return RC::INTERNAL;
   }
 
+  if(!type_value.isNumeric()) {
+    LOG_ERROR("Index type of index [%s] is not an enum. json value=%s",
+        name_value.asCString(), type_value.toStyledString().c_str());
+    return RC::INTERNAL;
+  }
+
   const FieldMeta *field = table.field(field_value.asCString());
   if (nullptr == field) {
     LOG_ERROR("Deserialize index [%s]: no such field: %s", name_value.asCString(), field_value.asCString());
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  return index.init(name_value.asCString(), *field);
+  return index.init(name_value.asCString(), *field, static_cast<IndexMeta::IndexType>(type_value.asInt()));
 }
 
 const char *IndexMeta::name() const { return name_.c_str(); }
 
 const char *IndexMeta::field() const { return field_.c_str(); }
+
+IndexMeta::IndexType IndexMeta::type() const { return type_; }
 
 void IndexMeta::desc(ostream &os) const { os << "index name=" << name_ << ", field=" << field_; }

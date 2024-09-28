@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <string>
 #include <vector>
 #include <memory>
+#include "storage/index/index_meta.h"
 
 #include "common/value.h"
 
@@ -180,6 +181,7 @@ struct CreateIndexSqlNode
   std::string index_name;      ///< Index name
   std::string relation_name;   ///< Relation name
   std::string attribute_name;  ///< Attribute name
+  IndexMeta::IndexType index_type; ///< Index type
 };
 
 /**
