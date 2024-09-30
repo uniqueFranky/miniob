@@ -12,7 +12,6 @@ int DateType::compare(const Value &left, const Value &right) const {
   Date_t lval = left.get_date();
   Date_t rval = right.get_date();
   Value v1(lval), v2(rval);
-  printf("v1 = %s, v2 = %s\n", v1.to_string().c_str(), v2.to_string().c_str());
   if(lval == rval) {
     return 0;
   } else if(lval < rval) {
