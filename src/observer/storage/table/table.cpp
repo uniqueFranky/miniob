@@ -273,6 +273,19 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
+    if(value.is_null() && !field->nullable()) { // invalid null value
+      LOG_WARN("field %s is not nullable, but given null", field->name());
+      return RC::INVALID_ARGUMENT;
+    }
+    /* null values */
+    if(value.is_null()) {
+      memset(record_data + field->offset(), 0, field->len());
+      field->set_field_null_indicator(record_data, true);
+      rc = RC::SUCCESS;
+      continue;
+    }
+
+    /* not null values */
     if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
@@ -298,7 +311,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
-  size_t       copy_len = field->len();
+  size_t       copy_len = field->len() - 1; // -1 for omitting the null indicator byte
   const size_t data_len = value.length();
   if (field->type() == AttrType::CHARS) {
     if (copy_len > data_len) {
@@ -306,6 +319,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     }
   }
   memcpy(record_data + field->offset(), value.data(), copy_len);
+  field->set_field_null_indicator(record_data, value.is_null()); // set the null indicator byte
   return RC::SUCCESS;
 }
 
@@ -391,6 +405,9 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   Record record;
   while (OB_SUCC(rc = scanner.next(record))) {
+    if(field_meta->is_field_null(record.data())) { // is null, don't insert into the index
+      continue;
+    }
     if(index_type == IndexMeta::IndexType::Unique) {
       list<RID> existing;
       rc = index->get_entry(record.data(), existing);
@@ -494,6 +511,12 @@ RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
+    /* don't insert null value into the index */
+    const FieldMeta *field = table_meta_.field(index->index_meta().field());
+    if(field->is_field_null(record)) {
+      continue;
+    }
+
     rc = index->insert_entry(record, &rid);
     if (rc != RC::SUCCESS) {
       break;
@@ -506,6 +529,12 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
 {
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
+    /* null values are not in the index */
+    const FieldMeta *field = table_meta_.field(index->index_meta().field());
+    if(field->is_field_null(record)) {
+      continue;
+    }
+
     rc = index->delete_entry(record, &rid);
     if (rc != RC::SUCCESS) {
       if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {

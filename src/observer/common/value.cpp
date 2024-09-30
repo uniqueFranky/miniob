@@ -29,13 +29,17 @@ Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
-Value::Value(const Date_t &date) {set_date(date); }
+Value::Value(const Date_t &date) { set_date(date); }
 
 Value::Value(const Value &other)
 {
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
+  if(is_null_) {
+    return;
+  }
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
@@ -53,6 +57,7 @@ Value::Value(Value &&other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   this->value_     = other.value_;
+  this->is_null_   = other.is_null_;
   other.own_data_  = false;
   other.length_    = 0;
 }
@@ -66,6 +71,10 @@ Value &Value::operator=(const Value &other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
+  if(is_null_) {
+    return *this;
+  }
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
@@ -88,10 +97,13 @@ Value &Value::operator=(Value &&other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   this->value_     = other.value_;
+  this->is_null_   = other.is_null_;
   other.own_data_  = false;
   other.length_    = 0;
   return *this;
 }
+
+bool Value::is_null() const { return is_null_; }
 
 void Value::reset()
 {
@@ -108,10 +120,16 @@ void Value::reset()
   attr_type_ = AttrType::UNDEFINED;
   length_    = 0;
   own_data_  = false;
+  is_null_   = false;
 }
 
 void Value::set_data(char *data, int length)
 {
+  length--; // -1 for the null indicator byte
+  is_null_ = static_cast<bool>(data[length]);
+  if(is_null_) {
+    return;
+  }
   switch (attr_type_) {
     case AttrType::CHARS: {
       set_string(data, length);
@@ -189,8 +207,20 @@ void Value::set_date(const Date_t &val)
   length_            = sizeof(val);
 }
 
+void Value::set_null(AttrType type)
+{
+  reset();
+  this->attr_type_ = type;
+  this->is_null_ = true;
+}
+
 void Value::set_value(const Value &value)
 {
+  if(value.is_null_) {
+    this->attr_type_ = value.attr_type_;
+    this->is_null_ = true;
+    return;
+  }
   switch (value.attr_type_) {
     case AttrType::INTS: {
       set_int(value.get_int());
@@ -237,6 +267,9 @@ const char *Value::data() const
 
 string Value::to_string() const
 {
+  if(is_null_) {
+    return "NULL";
+  }
   string res;
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {
@@ -250,6 +283,7 @@ int Value::compare(const Value &other) const { return DataType::type_instance(th
 
 int Value::get_int() const
 {
+  ASSERT(!is_null_, "try to get int when the value is null");
   switch (attr_type_) {
     case AttrType::CHARS: {
       try {
@@ -278,6 +312,7 @@ int Value::get_int() const
 
 float Value::get_float() const
 {
+  ASSERT(!is_null_, "try to get float when the value is null");
   switch (attr_type_) {
     case AttrType::CHARS: {
       try {
@@ -304,10 +339,14 @@ float Value::get_float() const
   return 0;
 }
 
-string Value::get_string() const { return this->to_string(); }
+string Value::get_string() const {
+  ASSERT(!is_null_, "try to get string when the value is null");
+  return this->to_string();
+}
 
 bool Value::get_boolean() const
 {
+  ASSERT(!is_null_, "try to get boolean when the value is null");
   switch (attr_type_) {
     case AttrType::CHARS: {
       try {
@@ -347,6 +386,7 @@ bool Value::get_boolean() const
 
 Date_t Value::get_date() const
 {
+  ASSERT(!is_null_, "try to get date when the value is null");
   switch(attr_type_) {
     case AttrType::DATES: {
       return value_.date_value_;

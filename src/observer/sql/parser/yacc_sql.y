@@ -108,6 +108,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         STORAGE
         FORMAT
         UNIQUE
+        IS_T
+        NOT_T
+        NULL_T
+        NULLABLE
         EQ
         LT
         GT
@@ -134,6 +138,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
 }
 
 %token <number> NUMBER
@@ -186,6 +191,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
+%type <boolean>             nullable_desc
 
 %left '+' '-'
 %left '*' '/'
@@ -315,6 +321,23 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
       free($5);
     }
     ;
+
+nullable_desc:
+    // empty, not nullable by default
+    {
+        $$ = false;
+    }
+    |
+    NULLABLE
+    {
+        $$ = true;
+    }
+    | NOT_T NULL_T
+    {
+        $$ = false;
+    }
+    ;
+
 create_table_stmt:    /*create table 语句的语法解析树*/
     CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE storage_format
     {
@@ -356,15 +379,17 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE nullable_desc
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->length++; // +1 for null tag
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type nullable_desc
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
@@ -374,6 +399,8 @@ attr_def:
       } else {
         $$->length = 4;
       }
+      $$->length++; // +1 for null tag
+      $$->nullable = $3;
       free($1);
     }
     ;
@@ -463,6 +490,10 @@ value:
       $$ = new Value(tmp);
       free(tmp);
       free($1);
+    }
+    | NULL_T {
+        $$ = new Value();
+        @$ = @1;
     }
     ;
 storage_format:
@@ -725,6 +756,9 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | IS_T { $$ = IS; }
+    | IS_T NOT_T { $$ = IS_NOT; }
+
     ;
 
 // your code here

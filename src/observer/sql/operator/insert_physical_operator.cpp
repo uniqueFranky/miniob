@@ -41,6 +41,12 @@ RC InsertPhysicalOperator::open(Trx *trx)
     for(int i = 0; i < table_->table_meta().unique_index_num(); i++) {
       const IndexMeta *unique_index_meta = table_->table_meta().unique_index(i);
       Index *unique_index = table_->find_index(unique_index_meta->name());
+      /* omit null values */
+      const FieldMeta *field = table_->table_meta().field(unique_index_meta->field());
+      if(field->is_field_null(record.data())) {
+        continue;
+      }
+      /* check uniqueness for non-null values */
       list<RID> rids;
       rc = unique_index->get_entry(record.data(), rids);
       if(OB_FAIL(rc)) {

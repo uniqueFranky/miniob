@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
 #include "common/type/date_type.h"
+#include "common/log/log.h"
 
 /**
  * @brief 属性的值
@@ -37,7 +38,7 @@ public:
   friend class CharType;
   friend class DateType;
 
-  Value() = default;
+  Value(): attr_type_(AttrType::UNDEFINED), is_null_(true) {};
 
   ~Value() { reset(); }
 
@@ -59,31 +60,57 @@ public:
 
   static RC add(const Value &left, const Value &right, Value &result)
   {
+    if(left.is_null() || right.is_null()) {
+      LOG_WARN("null value can't be added");
+      return RC::INVALID_ARGUMENT;
+    }
     return DataType::type_instance(result.attr_type())->add(left, right, result);
   }
 
   static RC subtract(const Value &left, const Value &right, Value &result)
   {
+    if(left.is_null() || right.is_null()) {
+      LOG_WARN("null value can't be subtracted");
+      return RC::INVALID_ARGUMENT;
+    }
     return DataType::type_instance(result.attr_type())->subtract(left, right, result);
   }
 
   static RC multiply(const Value &left, const Value &right, Value &result)
   {
+    if(left.is_null() || right.is_null()) {
+      LOG_WARN("null value can't be multiplied");
+      return RC::INVALID_ARGUMENT;
+    }
     return DataType::type_instance(result.attr_type())->multiply(left, right, result);
   }
 
   static RC divide(const Value &left, const Value &right, Value &result)
   {
+    if(left.is_null() || right.is_null()) {
+      LOG_WARN("null value can't be divided");
+      return RC::INVALID_ARGUMENT;
+    }
     return DataType::type_instance(result.attr_type())->divide(left, right, result);
   }
 
   static RC negative(const Value &value, Value &result)
   {
+    if(value.is_null()) {
+      LOG_WARN("null value can't be negated");
+      return RC::INVALID_ARGUMENT;
+    }
     return DataType::type_instance(result.attr_type())->negative(value, result);
   }
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)
   {
+    if(value.is_null()) {
+      result.reset();
+      result.attr_type_ = to_type;
+      result.is_null_ = true;
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
@@ -92,6 +119,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_null(AttrType type);
 
   string to_string() const;
 
@@ -120,8 +148,13 @@ private:
   void set_string_from_other(const Value &other);
   void set_date(const Date_t &date);
 
+public:
+  bool is_null() const;
+
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
+
+  /// excluding null indicator byte
   int      length_    = 0;
 
   union Val
@@ -135,4 +168,6 @@ private:
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
   bool own_data_ = false;
+
+  bool is_null_ = false;
 };
