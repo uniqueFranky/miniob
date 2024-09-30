@@ -57,7 +57,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     }
     // 修改记录
     record.copy_data(record.data(), record.len()); // cannot set field when record does not own the memory
-    rc = record.set_field(field_meta->offset(), field_meta->len(), const_cast<char *>(values_[0].data()));
+    rc = record.set_field(field_meta->offset(), field_meta->len() - 1, const_cast<char *>(values_[0].data()));
     if(OB_FAIL(rc)) {
       LOG_WARN("Failed to update record.");
       return rc;
