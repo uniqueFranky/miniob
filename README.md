@@ -15,14 +15,15 @@ MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题�
 
 # Timeline
 
-| Assignment       |Score|Pass Time| Keywords                                  |Commit ID|
-|------------------|-----|---------|-------------------------------------------|---------|
-| drop-table       |10|2024-09-14 18:43| Table Meta Data                           | 4d95f5649cb680e97709e7d250a7c1f2b978f1ab  |
-| update           |10|2024-09-16 11:39| Logical/Physical Plan Generating          | 8ae210f8a59924fa90319d930e351ffb46879b0d |
-| date             |10|2024-09-16 17:07| Parsing, Type Converting                  | 6ae90c5e41028671d31620240f9191eb7c0b67a0|
-| aggregation-func |10|2024-09-28 00:49| Parsing, Error Handling                   | 4fbac94192ec7743fc062de00b4a48b726bb7dd4|
-| insert           |10|2024-09-28 17:46| Parsing, Logical/Physical Plan Generating | 8db8d4115778219fefee37956d8cc8ee64944f62|
-| unique           |10|2024-09-28 23:37| Metadata Serialization, Index Scanning    | 948abb52fe5e82b47310fd096575a897c7685533|
+| Assignment       |Score|Pass Time| Keywords                                              |Commit ID|
+|------------------|-----|---------|-------------------------------------------------------|---------|
+| drop-table       |10|2024-09-14 18:43| Table Meta Data                                       | 4d95f5649cb680e97709e7d250a7c1f2b978f1ab  |
+| update           |10|2024-09-16 11:39| Logical/Physical Plan Generating                      | 8ae210f8a59924fa90319d930e351ffb46879b0d |
+| date             |10|2024-09-16 17:07| Parsing, Type Converting                              | 6ae90c5e41028671d31620240f9191eb7c0b67a0|
+| aggregation-func |10|2024-09-28 00:49| Parsing, Error Handling                               | 4fbac94192ec7743fc062de00b4a48b726bb7dd4|
+| insert           |10|2024-09-28 17:46| Parsing, Logical/Physical Plan Generating             | 8db8d4115778219fefee37956d8cc8ee64944f62|
+| unique           |10|2024-09-28 23:37| Metadata Serialization, Index Scanning                | 948abb52fe5e82b47310fd096575a897c7685533|
+| null             |10|2024-10-01 00:36| Storage/Record/IndexKey Format, Expression Comparison | 2a087946b710aaa9f920144580341353e1bcc5a2|
 
 
 # [文档](https://oceanbase.github.io/miniob/)
