@@ -48,6 +48,12 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     records.emplace_back(static_cast<RowTuple *>(tuple)->record());
   }
 
+  // fix: 在写之前释放读锁
+  rc = children_.front()->close();
+  if(OB_FAIL(rc)) {
+    return rc;
+  }
+
   for(Record &record: records) {
     // 删除原记录
     rc = trx->delete_record(table_, record);
