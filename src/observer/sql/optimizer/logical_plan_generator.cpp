@@ -132,7 +132,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
     last_oper = &predicate_oper;
   }
-
   unique_ptr<LogicalOperator> group_by_oper;
   rc = create_group_by_plan(select_stmt, group_by_oper);
   if (OB_FAIL(rc)) {
@@ -154,7 +153,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   }
 
   // Order By
-  unique_ptr<SortLogicalOperator> sort_oper;
+  unique_ptr<SortLogicalOperator> sort_oper = make_unique<SortLogicalOperator>();
   std::vector<std::unique_ptr<Expression>> order_by_exprs = std::move(select_stmt->order_by());
   std::vector<OrderBySqlNode::OrderType> order_by_types = std::move(select_stmt->order_by_type());
   assert(order_by_exprs.size() == order_by_types.size());
@@ -162,7 +161,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     sort_oper->add_sort_metric(std::move(order_by_exprs[i]), order_by_types[i]);
   }
   sort_oper->add_child(std::move(project_oper));
-
   logical_operator = std::move(sort_oper);
   return RC::SUCCESS;
 }

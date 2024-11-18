@@ -9,6 +9,6 @@ void SortLogicalOperator::add_sort_metric(std::unique_ptr<Expression> field, Ord
   sort_types_.emplace_back(sort_type);
 }
 
-const std::vector<OrderBySqlNode::OrderType> &SortLogicalOperator::sort_types() {
+std::vector<OrderBySqlNode::OrderType> &SortLogicalOperator::sort_types() {
   return sort_types_;
 }

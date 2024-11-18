@@ -15,7 +15,7 @@ public:
 
 public:
   void add_sort_metric(std::unique_ptr<Expression> field, OrderBySqlNode::OrderType sort_type);
-  const std::vector<OrderBySqlNode::OrderType> &sort_types();
+  std::vector<OrderBySqlNode::OrderType> &sort_types();
 
 private:
   std::vector<OrderBySqlNode::OrderType> sort_types_;

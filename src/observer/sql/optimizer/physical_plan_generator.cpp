@@ -45,6 +45,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/physical_plan_generator.h"
 #include "sql/operator/update_logical_operator.h"
 #include "sql/operator/update_physical_operator.h"
+#include "sql/operator/sort_logical_operator.h"
+#include "sql/operator/sort_physical_operator.h"
 
 using namespace std;
 
@@ -91,6 +93,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::UPDATE: {
       return create_plan(static_cast<UpdateLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::SORT: {
+      return create_plan(static_cast<SortLogicalOperator &>(logical_operator), oper);
     } break;
 
     default: {
@@ -424,6 +430,21 @@ RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &logical_oper, uniqu
   }
   update_physical_operator->add_child(std::move(child_operator));
   oper = std::move(update_physical_operator);
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(SortLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper)
+{
+  unique_ptr<SortPhysicalOperator> sort_physical_operator(new SortPhysicalOperator(logical_oper.expressions(), logical_oper.sort_types()));
+  ASSERT(logical_oper.children().size() == 1, "SortLogicalOperator must exactly have 1 child");
+  unique_ptr<PhysicalOperator> child_operator;
+  RC rc = create(*logical_oper.children()[0], child_operator);
+  if(OB_FAIL(rc)) {
+    LOG_WARN("Failed to create child physical operator for UpdatePhysicalOperator.");
+    return rc;
+  }
+  sort_physical_operator->add_child(std::move(child_operator));
+  oper = std::move(sort_physical_operator);
   return rc;
 }
 

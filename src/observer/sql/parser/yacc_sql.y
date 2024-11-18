@@ -820,7 +820,7 @@ order_by_list:
     | order_by_item COMMA order_by_list
     {
         $$ = $3;
-        $$->emplace_back(std::move(*$1));
+        $$->insert($$->begin(), std::move(*$1));
         delete $1;
     }
     ;
