@@ -118,6 +118,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        ORDER
+        ASC
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -135,6 +137,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<std::string> *                 relation_list;
+  OrderBySqlNode *                           order_by_item;
+  std::vector<OrderBySqlNode> *              order_by_list;
+  OrderBySqlNode::OrderType                  order_type;
   char *                                     string;
   int                                        number;
   float                                      floats;
@@ -192,6 +197,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
 %type <boolean>             nullable_desc
+%type <order_type>          order_type
+%type <order_by_item>       order_by_item
+%type <order_by_list>       order_by_list
+%type <order_by_list>       order_by
 
 %left '+' '-'
 %left '*' '/'
@@ -535,7 +544,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM rel_list where group_by order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -556,6 +565,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($6 != nullptr) {
         $$->selection.group_by.swap(*$6);
         delete $6;
+      }
+
+      if($7 != nullptr) {
+        $$->selection.order_by.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -768,6 +782,60 @@ group_by:
       $$ = nullptr;
     }
     ;
+
+order_type:
+    /* empty */
+    {
+        $$ = OrderBySqlNode::OrderType::ASC;
+    }
+    | ASC
+    {
+        $$ = OrderBySqlNode::OrderType::ASC;
+    }
+    | DESC
+    {
+        $$ = OrderBySqlNode::OrderType::DESC;
+    }
+    ;
+
+order_by_item:
+    rel_attr order_type
+    {
+        $$ = new OrderBySqlNode();
+        RelAttrSqlNode *node = $1;
+        $$->expr = std::make_unique<UnboundFieldExpr>(node->relation_name, node->attribute_name);
+        $$->expr->set_name(token_name(sql_string, &@$));
+        delete $1;
+        $$ -> order_type = $2;
+    }
+    ;
+
+order_by_list:
+    order_by_item
+    {
+        $$ = new std::vector<OrderBySqlNode>();
+        $$->emplace_back(std::move(*$1));
+        delete $1;
+    }
+    | order_by_item COMMA order_by_list
+    {
+        $$ = $3;
+        $$->emplace_back(std::move(*$1));
+        delete $1;
+    }
+    ;
+
+order_by:
+    /* empty */
+    {
+        $$ = nullptr;
+    }
+    | ORDER BY order_by_list
+    {
+        $$ = $3;
+    }
+    ;
+
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {

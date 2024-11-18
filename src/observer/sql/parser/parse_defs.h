@@ -78,6 +78,17 @@ struct ConditionSqlNode
   Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
 };
 
+
+struct OrderBySqlNode
+{
+  enum OrderType {
+    ASC,
+    DESC
+  };
+  std::unique_ptr<Expression> expr;
+  OrderType order_type;
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -95,6 +106,7 @@ struct SelectSqlNode
   std::vector<std::string>                 relations;    ///< 查询的表
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<OrderBySqlNode>              order_by;
 };
 
 /**

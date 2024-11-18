@@ -2,9 +2,21 @@ MESSAGE(STATUS "This is CMAKE_CURRENT_SOURCE_DIR dir " ${CMAKE_CURRENT_SOURCE_DI
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
+SET (PARSER_WORKDIR ${CMAKE_CURRENT_SOURCE_DIR}/sql/parser)
+SET (PARSER_SOURCES ${PARSER_WORKDIR}/lex_sql.cpp ${PARSER_WORKDIR}/yacc_sql.cpp)
+SET (PARSER_HEADERS ${PARSER_WORKDIR}/lex_sql.h ${PARSER_WORKDIR}/yacc_sql.hpp)
+ADD_CUSTOM_COMMAND(
+    OUTPUT ${PARSER_SOURCES} ${PARSER_HEADERS}
+    COMMAND bash gen_parser.sh
+    DEPENDS ${PARSER_WORKDIR}/lex_sql.l ${PARSER_WORKDIR}/yacc_sql.y
+    WORKING_DIRECTORY ${PARSER_WORKDIR}
+    COMMENT "generating lex and yacc files"
+)
+
 FILE(GLOB_RECURSE ALL_SRC *.cpp *.c)
 SET(MAIN_SRC ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 MESSAGE("MAIN SRC: " ${MAIN_SRC})
+SET(LIB_SRC ${LIB_SRC} ${PARSER_SOURCES})
 FOREACH (F ${ALL_SRC})
 
     IF (NOT ${F} STREQUAL ${MAIN_SRC})
@@ -16,10 +28,9 @@ ENDFOREACH (F)
 
 SET(LIBEVENT_STATIC_LINK TRUE)
 FIND_PACKAGE(Libevent CONFIG REQUIRED)
+FIND_PACKAGE(jsoncpp CONFIG REQUIRED)
 
-# JsonCpp cannot work correctly with FIND_PACKAGE
-
-SET(LIBRARIES common pthread dl libevent::core libevent::pthreads libjsoncpp.a)
+SET(LIBRARIES common pthread dl libevent::core libevent::pthreads JsonCpp::JsonCpp)
 
 # 指定目标文件位置
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
