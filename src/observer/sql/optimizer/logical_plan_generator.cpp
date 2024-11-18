@@ -26,6 +26,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include "sql/operator/update_logical_operator.h"
+#include "sql/operator/sort_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -143,7 +145,17 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     project_oper->add_child(std::move(*last_oper));
   }
 
-  logical_operator = std::move(project_oper);
+  // Order By
+  unique_ptr<SortLogicalOperator> sort_oper;
+  std::vector<std::unique_ptr<Expression>> order_by_exprs = std::move(select_stmt->order_by());
+  std::vector<OrderBySqlNode::OrderType> order_by_types = std::move(select_stmt->order_by_type());
+  assert(order_by_exprs.size() == order_by_types.size());
+  for(int i = 0; i < order_by_exprs.size(); i++) {
+    sort_oper->add_sort_metric(std::move(order_by_exprs[i]), order_by_types[i]);
+  }
+  sort_oper->add_child(std::move(project_oper));
+
+  logical_operator = std::move(sort_oper);
   return RC::SUCCESS;
 }
 
