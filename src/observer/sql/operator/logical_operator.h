@@ -43,6 +43,7 @@ enum class LogicalOperatorType
   GROUP_BY,    ///< 分组
   UPDATE,      ///< 更新
   SORT,       ///< 排序
+  SUB_QUERY_PREDICATE,
 };
 
 /**

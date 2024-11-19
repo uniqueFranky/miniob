@@ -57,6 +57,8 @@ enum class PhysicalOperatorType
   EXPR_VEC,
   UPDATE,
   SORT,
+  SUB_QUERY_PREDICATE,
+  NO_OP,
 };
 
 /**

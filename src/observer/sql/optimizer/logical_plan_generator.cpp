@@ -28,6 +28,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/group_by_logical_operator.h"
 #include "sql/operator/update_logical_operator.h"
 #include "sql/operator/sort_logical_operator.h"
+#include "sql/operator/sub_query_predicate_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -119,7 +120,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   unique_ptr<LogicalOperator> predicate_oper;
 
-  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
+  RC rc = create_plan(select_stmt->simple_filter_stmt(), predicate_oper);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
@@ -132,6 +133,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
     last_oper = &predicate_oper;
   }
+
+  unique_ptr<LogicalOperator> sub_query_predicate_oper;
+  rc = create_plan(select_stmt->sub_query_filter_stmt(), *last_oper, sub_query_predicate_oper);
+  if(OB_FAIL(rc)) {
+    return rc;
+  }
+  last_oper = &sub_query_predicate_oper;
+
   unique_ptr<LogicalOperator> group_by_oper;
   rc = create_group_by_plan(select_stmt, group_by_oper);
   if (OB_FAIL(rc)) {
@@ -165,14 +174,14 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   return RC::SUCCESS;
 }
 
-RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
+RC LogicalPlanGenerator::create_plan(SimpleFilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   RC                                  rc = RC::SUCCESS;
   std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
-  for (const FilterUnit *filter_unit : filter_units) {
-    const FilterObj &filter_obj_left  = filter_unit->left();
-    const FilterObj &filter_obj_right = filter_unit->right();
+  const std::vector<FilterUnit<SimpleFilterObj> *>    &filter_units = filter_stmt->filter_units();
+  for (const FilterUnit<SimpleFilterObj> *filter_unit : filter_units) {
+    const SimpleFilterObj &filter_obj_left  = filter_unit->left();
+    const SimpleFilterObj &filter_obj_right = filter_unit->right();
 
     unique_ptr<Expression> left;
     unique_ptr<Expression> right;
@@ -267,6 +276,47 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   return rc;
 }
 
+RC LogicalPlanGenerator::create_plan(SubQueryFilterStmt *filter_stmt, std::unique_ptr<LogicalOperator> &last_oper, std::unique_ptr<LogicalOperator> &logical_operator) {
+  // SimpleFilter是用一个logical operator实现的，但是这里我们要用多个logical operator的父子组合实现sub query的and conjunction
+  // 参数中last_oper就是下层算子返回的tuple
+  RC rc = RC::SUCCESS;
+  logical_operator = std::move(last_oper);
+  for(const auto &unit: filter_stmt->filter_units()) {
+    std::unique_ptr<SubQueryPredicateLogicalOperator> op = std::make_unique<SubQueryPredicateLogicalOperator>(unit->comp());
+    if(unit->left().is_attr == false && unit->right().is_attr == false) { // 暂不支持两边都是subquery
+      return RC::INVALID_ARGUMENT;
+    }
+
+    std::unique_ptr<LogicalOperator> sub_query;
+    if(unit->left().is_attr == false) {
+      rc = create_plan(dynamic_cast<SelectStmt *>(unit->left().sub_query.get()), sub_query);
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      // sub-query返回的tuple
+      op->add_child(std::move(sub_query));
+      // 下层算子返回的oper
+      op->add_child(std::move(logical_operator));
+      op->set_field(false, unit->right().field);
+    } else {
+      rc = create_plan(dynamic_cast<SelectStmt *>(unit->right().sub_query.get()), sub_query);
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      // 下层算子返回的tuple
+      op->add_child(std::move(logical_operator));
+      // sub-query返回的tuple
+      op->add_child(std::move(sub_query));
+      op->set_field(true, unit->left().field);
+    }
+
+    // 更新返回的结果
+    logical_operator = std::move(op);
+  }
+  return rc;
+}
+
+
 int LogicalPlanGenerator::implicit_cast_cost(AttrType from, AttrType to)
 {
   if (from == to) {
@@ -287,7 +337,7 @@ RC LogicalPlanGenerator::create_plan(InsertStmt *insert_stmt, unique_ptr<Logical
 RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   Table                      *table       = delete_stmt->table();
-  FilterStmt                 *filter_stmt = delete_stmt->filter_stmt();
+  SimpleFilterStmt                 *filter_stmt = delete_stmt->filter_stmt();
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
 
   unique_ptr<LogicalOperator> predicate_oper;

@@ -112,6 +112,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NOT_T
         NULL_T
         NULLABLE
+        IN_T
         EQ
         LT
         GT
@@ -125,6 +126,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %union {
   ParsedSqlNode *                            sql_node;
   ConditionSqlNode *                         condition;
+  SelectSqlNode *                            sub_query;
   Value *                                    value;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;
@@ -201,6 +203,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <order_by_item>       order_by_item
 %type <order_by_list>       order_by_list
 %type <order_by_list>       order_by
+%type <sub_query>           sub_query_select_stmt
 
 %left '+' '-'
 %left '*' '/'
@@ -703,12 +706,12 @@ condition_list:
     }
     | condition {
       $$ = new std::vector<ConditionSqlNode>;
-      $$->emplace_back(*$1);
+      $$->emplace_back(std::move(*$1));
       delete $1;
     }
     | condition AND condition_list {
       $$ = $3;
-      $$->emplace_back(*$1);
+      $$->emplace_back(std::move(*$1));
       delete $1;
     }
     ;
@@ -716,9 +719,9 @@ condition:
     rel_attr comp_op value
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
+      $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
       $$->left_attr = *$1;
-      $$->right_is_attr = 0;
+      $$->right_type = ConditionSqlNode::SideType::VALUE;
       $$->right_value = *$3;
       $$->comp = $2;
 
@@ -728,9 +731,9 @@ condition:
     | value comp_op value 
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
+      $$->left_type = ConditionSqlNode::SideType::VALUE;
       $$->left_value = *$1;
-      $$->right_is_attr = 0;
+      $$->right_type = ConditionSqlNode::SideType::VALUE;
       $$->right_value = *$3;
       $$->comp = $2;
 
@@ -740,9 +743,9 @@ condition:
     | rel_attr comp_op rel_attr
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
+      $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
       $$->left_attr = *$1;
-      $$->right_is_attr = 1;
+      $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
       $$->right_attr = *$3;
       $$->comp = $2;
 
@@ -752,14 +755,59 @@ condition:
     | value comp_op rel_attr
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
+      $$->left_type = ConditionSqlNode::SideType::VALUE;
       $$->left_value = *$1;
-      $$->right_is_attr = 1;
+      $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
       $$->right_attr = *$3;
       $$->comp = $2;
 
       delete $1;
       delete $3;
+    }
+    | rel_attr comp_op LBRACE sub_query_select_stmt RBRACE
+    {
+        $$ = new ConditionSqlNode;
+        $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
+        $$->left_attr = *$1;
+        $$->comp = $2;
+        $$->right_type = ConditionSqlNode::SideType::SUBQUERY;
+        $$->right_sub_query = std::unique_ptr<SelectSqlNode>($4);
+
+        delete $1;
+        // do not delete $4;
+    }
+    | LBRACE sub_query_select_stmt RBRACE comp_op rel_attr
+    {
+        $$ = new ConditionSqlNode;
+        $$->left_type = ConditionSqlNode::SideType::SUBQUERY;
+        $$->left_sub_query = std::unique_ptr<SelectSqlNode>($2);
+        $$->comp = $4;
+        $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
+        $$->right_attr = *$5;
+
+        delete $5;
+        // do not delete $2;
+    }
+    ;
+
+sub_query_select_stmt:        /*  sub_query_select 语句的语法解析树*/
+    SELECT expression_list FROM rel_list where
+    {
+      $$ = new SelectSqlNode();
+      if ($2 != nullptr) {
+        $$->expressions.swap(*$2);
+        delete $2;
+      }
+
+      if ($4 != nullptr) {
+        $$->relations.swap(*$4);
+        delete $4;
+      }
+
+      if ($5 != nullptr) {
+        $$->conditions.swap(*$5);
+        delete $5;
+      }
     }
     ;
 
@@ -772,6 +820,8 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | IS_T { $$ = IS; }
     | IS_T NOT_T { $$ = IS_NOT; }
+    | IN_T { $$ = IN; }
+    | NOT_T IN_T { $$ = NOT_IN; }
 
     ;
 

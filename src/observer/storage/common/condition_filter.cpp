@@ -64,43 +64,55 @@ RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
   AttrType type_left  = AttrType::UNDEFINED;
   AttrType type_right = AttrType::UNDEFINED;
 
-  if (1 == condition.left_is_attr) {
-    left.is_attr                = true;
-    const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
-    if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
-      return RC::SCHEMA_FIELD_MISSING;
+  switch(condition.left_type) {
+    case ConditionSqlNode::SideType::ATTRIBUTE: {
+      left.is_attr                = true;
+      const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
+      if (nullptr == field_left) {
+        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      left.attr_length = field_left->len();
+      left.attr_offset = field_left->offset();
+
+      type_left = field_left->type();
+    } break;
+    case ConditionSqlNode::SideType::VALUE: {
+      left.is_attr = false;
+      left.value   = condition.left_value;  // 校验type 或者转换类型
+      type_left    = condition.left_value.attr_type();
+
+      left.attr_length = 0;
+      left.attr_offset = 0;
+    } break;
+    default: {
+      return RC::INVALID_ARGUMENT;
     }
-    left.attr_length = field_left->len();
-    left.attr_offset = field_left->offset();
-
-    type_left = field_left->type();
-  } else {
-    left.is_attr = false;
-    left.value   = condition.left_value;  // 校验type 或者转换类型
-    type_left    = condition.left_value.attr_type();
-
-    left.attr_length = 0;
-    left.attr_offset = 0;
   }
 
-  if (1 == condition.right_is_attr) {
-    right.is_attr                = true;
-    const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
-    if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    right.attr_length = field_right->len();
-    right.attr_offset = field_right->offset();
-    type_right        = field_right->type();
-  } else {
-    right.is_attr = false;
-    right.value   = condition.right_value;
-    type_right    = condition.right_value.attr_type();
+  switch(condition.right_type) {
+    case ConditionSqlNode::SideType::ATTRIBUTE: {
+      right.is_attr                = true;
+      const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
+      if (nullptr == field_right) {
+        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      right.attr_length = field_right->len();
+      right.attr_offset = field_right->offset();
+      type_right        = field_right->type();
+    } break;
+    case ConditionSqlNode::SideType::VALUE: {
+      right.is_attr = false;
+      right.value   = condition.right_value;
+      type_right    = condition.right_value.attr_type();
 
-    right.attr_length = 0;
-    right.attr_offset = 0;
+      right.attr_length = 0;
+      right.attr_offset = 0;
+    }
+    default: {
+      return RC::INVALID_ARGUMENT;
+    }
   }
 
   // 校验和转换

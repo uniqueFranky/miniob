@@ -21,8 +21,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
 
+
 class FieldMeta;
-class FilterStmt;
+class SimpleFilterStmt;
+class SubQueryFilterStmt;
 class Db;
 class Table;
 
@@ -43,7 +45,8 @@ public:
 
 public:
   const std::vector<Table *> &tables() const { return tables_; }
-  FilterStmt                 *filter_stmt() const { return filter_stmt_; }
+  SimpleFilterStmt                 *simple_filter_stmt() const { return simple_filter_stmt_; }
+  SubQueryFilterStmt               *sub_query_filter_stmt() const { return sub_query_filter_stmt_; }
 
   std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; }
@@ -53,7 +56,8 @@ public:
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
   std::vector<Table *>                     tables_;
-  FilterStmt                              *filter_stmt_ = nullptr;
+  SimpleFilterStmt                         *simple_filter_stmt_ = nullptr;
+  SubQueryFilterStmt                       *sub_query_filter_stmt_ = nullptr;
   std::vector<std::unique_ptr<Expression>> group_by_;
   std::vector<std::unique_ptr<Expression>> order_by_;
   std::vector<OrderBySqlNode::OrderType>   order_by_type_;

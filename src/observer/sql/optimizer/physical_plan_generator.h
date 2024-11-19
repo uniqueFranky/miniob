@@ -29,6 +29,7 @@ class CalcLogicalOperator;
 class GroupByLogicalOperator;
 class UpdateLogicalOperator;
 class SortLogicalOperator;
+class SubQueryPredicateLogicalOperator;
 
 /**
  * @brief 物理计划生成器
@@ -57,6 +58,7 @@ private:
   RC create_plan(GroupByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
   RC create_plan(UpdateLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
   RC create_plan(SortLogicalOperator &logicalOperator, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(SubQueryPredicateLogicalOperator &logicalOperator, std::unique_ptr<PhysicalOperator> &oper);
   RC create_vec_plan(ProjectLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
   RC create_vec_plan(TableGetLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
   RC create_vec_plan(GroupByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);

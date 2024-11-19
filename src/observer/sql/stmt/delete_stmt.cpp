@@ -18,7 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
-DeleteStmt::DeleteStmt(Table *table, FilterStmt *filter_stmt) : table_(table), filter_stmt_(filter_stmt) {}
+DeleteStmt::DeleteStmt(Table *table, SimpleFilterStmt *filter_stmt) : table_(table), filter_stmt_(filter_stmt) {}
 
 DeleteStmt::~DeleteStmt()
 {
@@ -46,8 +46,8 @@ RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
   std::unordered_map<std::string, Table *> table_map;
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
+  SimpleFilterStmt *filter_stmt = nullptr;
+  RC          rc          = SimpleFilterStmt::create(
       db, table, &table_map, delete_sql.conditions.data(), static_cast<int>(delete_sql.conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));

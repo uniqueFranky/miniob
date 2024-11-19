@@ -47,6 +47,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/update_physical_operator.h"
 #include "sql/operator/sort_logical_operator.h"
 #include "sql/operator/sort_physical_operator.h"
+#include "sql/operator/sub_query_predicate_logical_operator.h"
+#include "sql/operator/sub_query_predicate_physical_operator.h"
+#include "sql/operator/no_op_physical_operator.h"
 
 using namespace std;
 
@@ -99,6 +102,9 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
       return create_plan(static_cast<SortLogicalOperator &>(logical_operator), oper);
     } break;
 
+    case LogicalOperatorType::SUB_QUERY_PREDICATE: {
+      return create_plan(static_cast<SubQueryPredicateLogicalOperator &>(logical_operator), oper);
+    }
     default: {
       ASSERT(false, "unknown logical operator type");
       return RC::INVALID_ARGUMENT;
@@ -359,6 +365,10 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, std:
         std::move(logical_oper.aggregate_expressions()));
   }
 
+  if(logical_oper.children().size() == 0) { // predicate被优化掉了
+    oper = std::make_unique<NoOpPhysicalOperator>();
+    return RC::SUCCESS;
+  }
   ASSERT(logical_oper.children().size() == 1, "group by operator should have 1 child");
 
   LogicalOperator             &child_oper = *logical_oper.children().front();
@@ -447,6 +457,29 @@ RC PhysicalPlanGenerator::create_plan(SortLogicalOperator &logical_oper, unique_
   oper = std::move(sort_physical_operator);
   return rc;
 }
+
+RC PhysicalPlanGenerator::create_plan(SubQueryPredicateLogicalOperator &logicalOperator, std::unique_ptr<PhysicalOperator> &oper) {
+  std::unique_ptr<SubQueryPredicatePhysicalOperator> op = std::make_unique<SubQueryPredicatePhysicalOperator>();
+  op->set_comp(logicalOperator.comp_op());
+  op->set_field(logicalOperator.left_is_field(), logicalOperator.field());
+
+  std::unique_ptr<PhysicalOperator> left;
+  RC rc = create(*logicalOperator.children()[0], left);
+  if(OB_FAIL(rc)) {
+    return rc;
+  }
+  std::unique_ptr<PhysicalOperator> right;
+  rc = create(*logicalOperator.children()[1], right);
+  if(OB_FAIL(rc)) {
+    return rc;
+  }
+
+  op->add_child(std::move(left));
+  op->add_child(std::move(right));
+  oper = std::move(op);
+  return rc;
+}
+
 
 RC PhysicalPlanGenerator::create_vec_plan(ProjectLogicalOperator &project_oper, unique_ptr<PhysicalOperator> &oper)
 {

@@ -25,9 +25,9 @@ using namespace common;
 
 SelectStmt::~SelectStmt()
 {
-  if (nullptr != filter_stmt_) {
-    delete filter_stmt_;
-    filter_stmt_ = nullptr;
+  if (nullptr != simple_filter_stmt_) {
+    delete simple_filter_stmt_;
+    simple_filter_stmt_ = nullptr;
   }
 }
 
@@ -98,16 +98,35 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // create filter statement in `where` statement
-  FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
+
+  std::vector<ConditionSqlNode> simple_conditions;
+  std::vector<ConditionSqlNode> sub_query_conditions;
+  for(auto &condition: select_sql.conditions) {
+    if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
+      sub_query_conditions.emplace_back(std::move(condition));
+      LOG_INFO("sub query");
+    } else {
+      LOG_INFO("simple");
+      simple_conditions.emplace_back(std::move(condition));
+    }
+  }
+  // create simple filter statement in `where` statement
+  SimpleFilterStmt *simple_filter_stmt = nullptr;
+  RC          rc          = SimpleFilterStmt::create(db,
       default_table,
       &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
-      filter_stmt);
+      simple_conditions.data(),
+      static_cast<int>(simple_conditions.size()),
+      simple_filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
+    return rc;
+  }
+
+  // create sub query filter statement in `where` statement
+  SubQueryFilterStmt *sub_query_filter_stmt = nullptr;
+  rc = SubQueryFilterStmt::create(db, default_table, &table_map, sub_query_conditions.data(), static_cast<int>(sub_query_conditions.size()), sub_query_filter_stmt);
+  if(OB_FAIL(rc)) {
     return rc;
   }
 
@@ -116,7 +135,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
-  select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->simple_filter_stmt_ = simple_filter_stmt;
+  select_stmt->sub_query_filter_stmt_ = sub_query_filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->order_by_type_.swap(order_by_types);

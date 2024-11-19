@@ -43,6 +43,7 @@ public:
   Tuple *current_tuple() override;
 
   void set_predicates(std::vector<std::unique_ptr<Expression>> &&exprs);
+  RC tuple_schema(TupleSchema &schema) const override;
 
 private:
   RC filter(RowTuple &tuple, bool &result);

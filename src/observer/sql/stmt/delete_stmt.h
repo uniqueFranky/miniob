@@ -16,22 +16,25 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
+#include "filter_stmt.h"
 
 class Table;
+template<typename FilterObj>
 class FilterStmt;
 
 /**
  * @brief Delete 语句
  * @ingroup Statement
+ * 目前不支持delete的sub query
  */
 class DeleteStmt : public Stmt
 {
 public:
-  DeleteStmt(Table *table, FilterStmt *filter_stmt);
+  DeleteStmt(Table *table, SimpleFilterStmt *filter_stmt);
   ~DeleteStmt() override;
 
   Table      *table() const { return table_; }
-  FilterStmt *filter_stmt() const { return filter_stmt_; }
+  SimpleFilterStmt *filter_stmt() const { return filter_stmt_; }
 
   StmtType type() const override { return StmtType::DELETE; }
 
@@ -40,5 +43,5 @@ public:
 
 private:
   Table      *table_       = nullptr;
-  FilterStmt *filter_stmt_ = nullptr;
+  SimpleFilterStmt *filter_stmt_ = nullptr;
 };

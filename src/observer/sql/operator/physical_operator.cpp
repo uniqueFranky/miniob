@@ -35,6 +35,8 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::EXPR_VEC: return "EXPR_VEC";
     case PhysicalOperatorType::UPDATE: return "UPDATE";
     case PhysicalOperatorType::SORT: return "SORT";
+    case PhysicalOperatorType::SUB_QUERY_PREDICATE: return "SUB_QUERY_PREDICATE";
+    case PhysicalOperatorType::NO_OP: return "NO_OP";
     default: return "UNKNOWN";
   }
 }

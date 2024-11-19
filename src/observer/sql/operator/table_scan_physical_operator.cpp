@@ -88,3 +88,12 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
   result = true;
   return rc;
 }
+
+RC TableScanPhysicalOperator::tuple_schema(TupleSchema &schema) const {
+  schema = TupleSchema();
+  for(const auto &field: *table_->table_meta().field_metas()) {
+    TupleCellSpec spec(table_->table_meta().name(), field.name());
+    schema.append_cell(spec);
+  }
+  return RC::SUCCESS;
+}
