@@ -63,6 +63,36 @@ RC SubQueryPredicatePhysicalOperator::open(Trx *trx) {
     specs_.emplace_back(schema.cell_at(i));
   }
 
+
+  // check for validation
+  switch (comp_) {
+    case CompOp::EQUAL_TO:
+    case CompOp::NOT_EQUAL:
+    case CompOp::LESS_THAN:
+    case CompOp::LESS_EQUAL:
+    case CompOp::GREAT_THAN:
+    case CompOp::GREAT_EQUAL: {
+      if(left_is_field_ && (right_records_.size() > 1 || (right_records_.size() > 0 && right_records_[0].size() != 1))) {
+        return RC::INVALID_ARGUMENT;
+      }
+      if(!left_is_field_ && (left_records_.size() > 1 || (left_records_.size() > 0 && left_records_[0].size() != 1))) {
+        return RC::INVALID_ARGUMENT;
+      }
+    } break;
+    case CompOp::IN:
+    case CompOp::NOT_IN: {
+      if(left_is_field_ && (right_records_.size() > 0 && right_records_[0].size() != 1)) {
+        return RC::INVALID_ARGUMENT;
+      }
+      if(!left_is_field_ && (left_records_.size() > 0 && left_records_[0].size() != 1)) {
+        return RC::INVALID_ARGUMENT;
+      }
+    } break;
+    default: {
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+
   return rc;
 }
 
@@ -146,7 +176,7 @@ static bool evaluate(const Value &v, const std::vector<std::vector<Value>> &set,
       return false;
     } break;
     case CompOp::NOT_IN: {
-      if(set.size() < 1 || set[0].size() != 1 || reverse) {
+      if((set.size() > 0 && set[0].size() != 1) || reverse) {
         return false;
       }
       for(const std::vector<Value> &s: set) {
