@@ -205,6 +205,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     const char *name1 = schema.cell_at(i).table_name();
     const char *name2 = schema.cell_at(i - 1).table_name();
     multiple_table |= (strcmp(name1, name2) != 0);
+    // LOG_DEBUG("name1: %s, name2: %s, multiple_table: %d", name1, name2, multiple_table);
   }
 
   for (int i = 0; i < cell_num; i++) {
@@ -220,7 +221,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
           return rc;
         }
       }
-      if(multiple_table) {
+      
+      if(multiple_table && schema.cell_at(i).show_tableName()) { // 多表聚合函数不应该是 .AGG(table_name.ID) ，而是 AGG(table_name.ID)
         const char *table_name = schema.cell_at(i).table_name();
         rc = writer_->writen(table_name, strlen(table_name));
         if (OB_FAIL(rc)) {

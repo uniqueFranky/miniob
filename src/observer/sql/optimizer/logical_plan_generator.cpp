@@ -403,6 +403,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   return RC::SUCCESS;
 }
 
+// create plan for group by * or * aggregation
 RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   vector<unique_ptr<Expression>> &group_by_expressions = select_stmt->group_by();
@@ -412,7 +413,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     RC rc = RC::SUCCESS;
     if (expr->type() == ExprType::AGGREGATION) {
       expr->set_pos(aggregate_expressions.size() + group_by_expressions.size());
-      aggregate_expressions.push_back(expr.get());
+      aggregate_expressions.push_back(expr.get()); // find all the aggregate expressions used in the query
     }
     rc = ExpressionIterator::iterate_child_expr(*expr, collector);
     return rc;
@@ -425,7 +426,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
       if (expr->type() == ExprType::AGGREGATION) {
         break;
       } else if (expr->equal(*group_by)) {
-        expr->set_pos(i);
+        expr->set_pos(i); // find the group by expression in query expressions
         continue;
       } else {
         rc = ExpressionIterator::iterate_child_expr(*expr, bind_group_by_expr);
@@ -437,9 +438,9 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
  bool found_unbound_column = false;
   function<RC(std::unique_ptr<Expression>&)> find_unbound_column = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
-    if (expr->type() == ExprType::AGGREGATION) {
+    if (expr->type() == ExprType::AGGREGATION) { // bound in aggregate function
       // do nothing
-    } else if (expr->pos() != -1) {
+    } else if (expr->pos() != -1) { // already bound in group by
       // do nothing
     } else if (expr->type() == ExprType::FIELD) {
       found_unbound_column = true;
@@ -455,7 +456,12 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   }
 
   for (unique_ptr<Expression> &expression : query_expressions) {
-    find_unbound_column(expression);
+    find_unbound_column(expression); // find the query expressions that are not bound in group by or aggregate function
+    // because they must appear in the GROUP BY clause or must be part of an aggregate function or they are invalid
+    // 要么 query 的全在 group by 里，select a group by a 这样相当于对 a 去重；
+    // 要么 query 的全在 aggregate 里, select agg(a) group by a 这样相当于对 a 聚合；
+    // 要么 query 的全在 group by 里和 aggregate 里，select a, agg(b) group by a 这样相当于将所有 a 相同的一组之后再聚合；
+    // 如果有不在 group by 里也不在 aggregate 里的，就是错误的，因为没法将这个值聚合到一个值上
   }
 
   // collect all aggregate expressions

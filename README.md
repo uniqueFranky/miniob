@@ -26,6 +26,7 @@ MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题�
 | null             |10|2024-10-01 00:36| Storage/Record/IndexKey Format, Expression Comparison | 2a087946b710aaa9f920144580341353e1bcc5a2|
 | order-by         |10|2024-11-18 22:22| Parsing, Tuple Convertion, Sorting                    | e564028e03d9bf4ce79b9e6484f01c9fb1483ea3|
 | simple-sub-query |10|2024-11-19 16:25| Parsing, Physical Operator, Filter Statement          | 7484ede11591e517488ce73f4e48010906f92fb0|
+| group-by         |20|2024-12-24 17:38|                                                       | 7d21b81a3af89a77fe0f89085187ab503606fe44|
 
 
 # [文档](https://oceanbase.github.io/miniob/)

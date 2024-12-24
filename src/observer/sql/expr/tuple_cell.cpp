@@ -17,7 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-TupleCellSpec::TupleCellSpec(const char *table_name, const char *field_name, const char *alias)
+TupleCellSpec::TupleCellSpec(const char *table_name, const char *field_name, const char *alias, bool showTableName)
 {
   if (table_name) {
     table_name_ = table_name;
@@ -34,6 +34,7 @@ TupleCellSpec::TupleCellSpec(const char *table_name, const char *field_name, con
       alias_ = table_name_ + "." + field_name_;
     }
   }
+  showTableName_ = showTableName;
 }
 
 TupleCellSpec::TupleCellSpec(const char *alias)

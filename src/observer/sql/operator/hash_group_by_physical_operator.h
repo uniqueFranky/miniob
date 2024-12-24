@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
  * @details 通过 hash 的方式进行 group by 操作。当聚合函数存在 group by
  * 表达式时，默认采用这个物理算子（当前也只有这个物理算子）。 NOTE:
  * 当前并没有使用hash方式实现，而是每次使用线性查找的方式。
+ * UPDATE: 2024/12/24 使用hash方式实现
  */
 class HashGroupByPhysicalOperator : public GroupByPhysicalOperator
 {
@@ -56,7 +57,9 @@ private:
   /// pair的first是group by 的值列表，second是计算出来的表达式值列表
   /// TODO 改成hash/unordered_map
   std::vector<GroupType> groups_;
+  std::unordered_map<ValueListTuple, GroupType, ValueListTuple::Hash> group_map_;
 
-  std::vector<GroupType>::iterator current_group_;
+  std::unordered_map<ValueListTuple, GroupType, ValueListTuple::Hash>::iterator current_group_;
+  // std::vector<GroupType>::iterator current_group_;
   bool                             first_emited_ = false;  /// 第一条数据是否已经输出
 };

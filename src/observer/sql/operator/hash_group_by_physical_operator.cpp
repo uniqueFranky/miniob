@@ -55,7 +55,6 @@ RC HashGroupByPhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to find group. rc=%s", strrc(rc));
       return rc;
     }
-
     // 计算需要做聚合的值
     group_value_expression_tuple.set_tuple(child_tuple);
 
@@ -78,8 +77,11 @@ RC HashGroupByPhysicalOperator::open(Trx *trx)
   }
 
   // 得到最终聚合后的值
-  for (GroupType &group : groups_) {
-    GroupValueType &group_value = get<1>(group);
+  //for (GroupType &group : groups_) 
+  for (auto &group : group_map_)
+  {
+    //GroupValueType &group_value = get<1>(group);
+    GroupValueType &group_value = get<1>(group.second);
     rc = evaluate(group_value);
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to evaluate group value. rc=%s", strrc(rc));
@@ -87,14 +89,17 @@ RC HashGroupByPhysicalOperator::open(Trx *trx)
     }
   }
 
-  current_group_ = groups_.begin();
+  // current_group_ = groups_.begin();
+  current_group_ = group_map_.begin();
   first_emited_  = false;
   return rc;
 }
 
 RC HashGroupByPhysicalOperator::next()
 {
-  if (current_group_ == groups_.end()) {
+  //if (current_group_ == groups_.end()) 
+  if (current_group_ == group_map_.end())
+  {
     return RC::RECORD_EOF;
   }
 
@@ -103,7 +108,9 @@ RC HashGroupByPhysicalOperator::next()
   } else {
     first_emited_ = true;
   }
-  if (current_group_ == groups_.end()) {
+  //if (current_group_ == groups_.end()) 
+  if (current_group_ == group_map_.end())
+  {
     return RC::RECORD_EOF;
   }
 
@@ -119,8 +126,11 @@ RC HashGroupByPhysicalOperator::close()
 
 Tuple *HashGroupByPhysicalOperator::current_tuple()
 {
-  if (current_group_ != groups_.end()) {
-    GroupValueType &group_value = get<1>(*current_group_);
+  //if (current_group_ != groups_.end()) 
+  if (current_group_ != group_map_.end())
+  {
+    // GroupValueType &group_value = get<1>(*current_group_);
+    GroupValueType &group_value = get<1>(current_group_->second);
     return &get<1>(group_value);
   }
   return nullptr;
@@ -142,22 +152,27 @@ RC HashGroupByPhysicalOperator::find_group(const Tuple &child_tuple, GroupType *
   }
 
   // 找到对应的group
-  for (GroupType &group : groups_) {
-    int compare_result = 0;
-    rc                 = group_by_evaluated_tuple.compare(get<0>(group), compare_result);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("failed to compare group by values. rc=%s", strrc(rc));
-      return rc;
-    }
-
-    if (compare_result == 0) {
-      found_group = &group;
-      break;
-    }
+  if (group_map_.find(group_by_evaluated_tuple) != group_map_.end()) {
+    found_group = &group_map_[group_by_evaluated_tuple];
+    return rc;
   }
+  // for (GroupType &group : groups_) {
+  //   int compare_result = 0;
+  //   rc                 = group_by_evaluated_tuple.compare(get<0>(group), compare_result);
+  //   if (OB_FAIL(rc)) {
+  //     LOG_WARN("failed to compare group by values. rc=%s", strrc(rc));
+  //     return rc;
+  //   }
+
+  //   if (compare_result == 0) {
+  //     found_group = &group;
+  //     break;
+  //   }
+  // }
 
   // 如果没有找到对应的group，创建一个新的group
-  if (nullptr == found_group) {
+  if (found_group == nullptr) {
+  //if (group_map_.find(group_by_evaluated_tuple) == group_map_.end()) {
     AggregatorList aggregator_list;
     create_aggregator_list(aggregator_list);
 
@@ -170,10 +185,13 @@ RC HashGroupByPhysicalOperator::find_group(const Tuple &child_tuple, GroupType *
 
     CompositeTuple composite_tuple;
     composite_tuple.add_tuple(make_unique<ValueListTuple>(std::move(child_tuple_to_value)));
-    groups_.emplace_back(std::move(group_by_evaluated_tuple), 
-                         GroupValueType(std::move(aggregator_list), std::move(composite_tuple)));
-    found_group = &groups_.back();
+
+    // groups_.emplace_back(group_by_evaluated_tuple, 
+    //                      GroupValueType(aggregator_list, composite_tuple));
+    group_map_.emplace(group_by_evaluated_tuple, GroupType(group_by_evaluated_tuple, GroupValueType(std::move(aggregator_list), std::move(composite_tuple))));
+    // found_group = &groups_.back();
   }
 
+  found_group = &group_map_[group_by_evaluated_tuple];
   return rc;
 }

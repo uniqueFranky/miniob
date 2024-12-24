@@ -320,6 +320,28 @@ class ValueListTuple : public Tuple
 public:
   ValueListTuple()          = default;
   virtual ~ValueListTuple() = default;
+  // 重载hash操作符 for unordered_map
+  struct Hash {
+    size_t operator()(const ValueListTuple &tuple) const
+    {
+      size_t hash = 0;
+      for (int i = 0; i < tuple.cell_num(); i++) {
+        Value cell;
+        tuple.cell_at(i, cell);
+        std::hash<std::string> value_hash;
+        hash ^= value_hash(cell.to_string()) + 0x9e3779b9 + (hash << 6) + (hash >> 2);  // 结合位移操作，提高分散性
+        // hash ^= value_hash(cell.to_string());
+      }
+      return hash;
+    }
+  };
+  // 重载==操作符 for unordered_map
+  bool operator==(const ValueListTuple &other) const
+  {
+    int result = 0;
+    compare(other, result);
+    return result == 0;
+  }
 
   void set_names(const std::vector<TupleCellSpec> &specs) { specs_ = specs; }
   void set_cells(const std::vector<Value> &cells) { cells_ = cells; }

@@ -831,6 +831,9 @@ group_by:
     {
       $$ = nullptr;
     }
+    | GROUP BY expression_list {
+      $$ = $3;
+    }
     ;
 
 order_type:

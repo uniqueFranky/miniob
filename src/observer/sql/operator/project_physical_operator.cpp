@@ -61,13 +61,26 @@ Tuple *ProjectPhysicalOperator::current_tuple()
   return &tuple_;
 }
 
+#include <common/log/log.h>
+
 RC ProjectPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
   for (const unique_ptr<Expression> &expression : expressions_) {
+    // LOG_DEBUG("expression name: %s", expression->name());
     if(expression->type() == ExprType::FIELD) {
       schema.append_cell(TupleCellSpec(dynamic_cast<const FieldExpr *>(expression.get())->table_name(), expression->name(), expression->name()));
-    } else {
-      schema.append_cell(expression->name());
+    } 
+    else if (expression->type() == ExprType::AGGREGATION) { // 避免认为聚合函数的字段名为空 而认为其是多表。同时也应该保有其表名
+      if(dynamic_cast<const AggregateExpr *>(expression.get())->child()->type() == ExprType::FIELD) {
+        // LOG_DEBUG("aggregate expression's table name: %s", dynamic_cast<const FieldExpr *>(dynamic_cast<const AggregateExpr *>(expression.get())->child().get())->table_name());
+        schema.append_cell(TupleCellSpec(dynamic_cast<const FieldExpr *>(dynamic_cast<const AggregateExpr *>(expression.get())->child().get())->table_name(), expression->name(), expression->name(), false));
+      }
+      else { // StarExpr
+        schema.append_cell(expression->name());
+      }
+    }
+    else {
+      schema.append_cell(expression->name()); 
     }
   }
   return RC::SUCCESS;
