@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utility>
 #include <algorithm>
 
 #include "common/log/log.h"
@@ -113,6 +114,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NULL_T
         NULLABLE
         IN_T
+        INNER
+        JOIN
         EQ
         LT
         GT
@@ -138,7 +141,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::vector<Value>> *          insert_item_list;
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
   OrderBySqlNode *                           order_by_item;
   std::vector<OrderBySqlNode> *              order_by_list;
   OrderBySqlNode::OrderType                  order_type;
@@ -146,7 +148,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   int                                        number;
   float                                      floats;
   bool                                       boolean;
+  std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode> > > > * relation_list;
+  std::vector<std::pair<std::string, std::vector<ConditionSqlNode> > > * relatoin_sub_item;
 }
+// std::vector<std::string> *                 relation_list;
 
 %token <number> NUMBER
 %token <floats> FLOAT
@@ -159,7 +164,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <string>              relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -204,6 +208,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <order_by_list>       order_by_list
 %type <order_by_list>       order_by
 %type <sub_query>           sub_query_select_stmt
+%type <relatoin_sub_item>   relation
+%type <relatoin_sub_item>   inner_join_list
+// %type <string>           relation
 
 %left '+' '-'
 %left '*' '/'
@@ -668,25 +675,39 @@ rel_attr:
     ;
 
 relation:
-    ID {
-      $$ = $1;
+    ID inner_join_list {
+      $$ = $2;
+      std::string s = $1;
+      free($1);
+      $$->emplace_back(s, std::move(std::vector<ConditionSqlNode>()) );
     }
     ;
+
+inner_join_list:
+    /* empty */
+    {
+      $$ = new std::vector<std::pair<std::string, std::vector<ConditionSqlNode> > >();
+    }
+    | INNER JOIN ID ON condition_list inner_join_list {
+      $$ = $6;
+      std::string s = $3;
+      free($3); // char *
+      $$->emplace_back(s, std::move(*$5));
+    }
+    ;
+
 rel_list:
     relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
-      free($1);
+      $$ = new std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode> > > >();
+      // $1->reverse($1->begin(), $1->end());
+      $$->emplace_back(std::move(*$1));
+      // delete $1;
     }
     | relation COMMA rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<std::string>;
-      }
-
-      $$->insert($$->begin(), $1);
-      free($1);
+      $$ = $3;
+      // $1->reverse($1->begin(), $1->end());
+      $$->emplace_back(std::move(*$1));
+      // delete $1;
     }
     ;
 

@@ -44,21 +44,24 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
-    if (nullptr == table_name) {
-      LOG_WARN("invalid argument. relation name is null. index=%d", i);
-      return RC::INVALID_ARGUMENT;
-    }
+    // NOTE: std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode>>>> SelectSqlNode::relations
+    for (size_t j = 0; j < select_sql.relations[i].size(); ++ j) {
+      const char *table_name = select_sql.relations[i][j].first.c_str();
+      if (nullptr == table_name) {
+        LOG_WARN("invalid argument. relation name is null. index=%d", i);
+        return RC::INVALID_ARGUMENT;
+      }
 
-    Table *table = db->find_table(table_name);
-    if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
-    }
+      Table *table = db->find_table(table_name);
+      if (nullptr == table) {
+        LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
 
-    binder_context.add_table(table);
-    tables.push_back(table);
-    table_map.insert({table_name, table});
+      binder_context.add_table(table);
+      tables.push_back(table);
+      table_map.insert({table_name, table});
+    }
   }
 
   // collect query fields in `select` statement
@@ -108,6 +111,20 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     } else {
       LOG_INFO("simple");
       simple_conditions.emplace_back(std::move(condition));
+    }
+  }
+  // inner join 和 where 本质上是一样的，只是 inner join 会在 from 语句中指定，这里给他们合并处理
+  for (size_t i = 0;i < select_sql.relations.size(); i++) {
+    for (size_t j = 0; j < select_sql.relations[i].size(); ++ j) {
+      for (auto &condition: select_sql.relations[i][j].second) {
+        if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
+          sub_query_conditions.emplace_back(std::move(condition));
+          LOG_INFO("sub query");
+        } else {
+          LOG_INFO("simple");
+          simple_conditions.emplace_back(std::move(condition));
+        }
+      }
     }
   }
   // create simple filter statement in `where` statement

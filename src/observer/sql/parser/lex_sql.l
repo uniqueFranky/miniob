@@ -127,6 +127,8 @@ NOT                                     RETURN_TOKEN(NOT_T);
 NULL                                    RETURN_TOKEN(NULL_T);
 NULLABLE                                RETURN_TOKEN(NULLABLE);
 IN                                      RETURN_TOKEN(IN_T);
+INNER                                   RETURN_TOKEN(INNER);
+JOIN                                    RETURN_TOKEN(JOIN);
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
