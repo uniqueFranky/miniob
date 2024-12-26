@@ -31,38 +31,31 @@ RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::str
 
 struct SimpleFilterObj
 {
-  bool  is_attr;
-  Field field;
-  Value value;
-
-  void init_attr(const Field &field)
-  {
-    is_attr     = true;
-    this->field = field;
+  std::unique_ptr<Expression> expr;
+  SimpleFilterObj(std::unique_ptr<Expression> &&exp) {
+    expr = std::move(exp);
   }
-
-  void init_value(const Value &value)
-  {
-    is_attr     = false;
-    this->value = value;
-  }
+  SimpleFilterObj() = default;
 };
 
 struct SubQueryFilterObj {
-  bool is_attr;
-  Field field;
+  bool is_expr;
   // 一定是QueryStmt
   std::unique_ptr<Stmt> sub_query;
+  std::unique_ptr<Expression> expr;
 
-  void init_attr(const Field &field) {
-    is_attr = true;
-    this->field = field;
+  SubQueryFilterObj(std::unique_ptr<Stmt> &&stmt) {
+    sub_query = std::move(stmt);
+    is_expr = false;
   }
 
-  void init_sub_query(std::unique_ptr<Stmt> sub_query) {
-    is_attr = false;
-    this->sub_query = std::move(sub_query);
+  SubQueryFilterObj(std::unique_ptr<Expression> &&exp) {
+    expr = std::move(exp);
+    is_expr = true;
   }
+
+  SubQueryFilterObj() = default;
+
 };
 
 template<typename FilterObj>
@@ -79,8 +72,8 @@ public:
   void set_left(FilterObj obj) { left_ = std::move(obj); }
   void set_right(FilterObj obj) { right_ = std::move(obj); }
 
-  const FilterObj &left() const { return left_; }
-  const FilterObj &right() const { return right_; }
+  FilterObj &left() { return left_; }
+  FilterObj &right() { return right_; }
 
 private:
   CompOp    comp_ = NO_OP;
@@ -105,7 +98,7 @@ public:
   }
 
 public:
-  const std::vector<FilterUnit<FilterObj> *> &filter_units() const { return filter_units_; }
+  std::vector<FilterUnit<FilterObj> *> &filter_units() { return filter_units_; }
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
                                         const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt) = delete;
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
@@ -119,9 +112,9 @@ public:
   SimpleFilterStmt() = default;
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode *conditions, int condition_num, SimpleFilterStmt *&stmt);
+      ConditionSqlNode *conditions, int condition_num, SimpleFilterStmt *&stmt);
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode &condition, FilterUnit<SimpleFilterObj> *&filter_unit);
+      ConditionSqlNode &condition, FilterUnit<SimpleFilterObj> *&filter_unit);
 };
 
 class SubQueryFilterStmt: public FilterStmt<SubQueryFilterObj> {
@@ -129,7 +122,7 @@ public:
   SubQueryFilterStmt() = default;
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode *conditions, int condition_num, SubQueryFilterStmt *&stmt);
+      ConditionSqlNode *conditions, int condition_num, SubQueryFilterStmt *&stmt);
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode &condition, FilterUnit<SubQueryFilterObj> *&filter_unit);
+      ConditionSqlNode &condition, FilterUnit<SubQueryFilterObj> *&filter_unit);
 };

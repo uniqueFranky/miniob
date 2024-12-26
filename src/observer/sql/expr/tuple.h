@@ -54,12 +54,34 @@ public:
   void append_cell(const TupleCellSpec &cell) { cells_.push_back(cell); }
   void append_cell(const char *table, const char *field) { append_cell(TupleCellSpec(table, field)); }
   void append_cell(const char *alias) { append_cell(TupleCellSpec(alias)); }
+  void append_cell(ArithmeticExpr *exp) {
+    exp->calculate_table_names();
+    append_cell(TupleCellSpec(nullptr, nullptr, exp->name(), false));
+    for(const auto &name: exp->table_names()) {
+      table_names_.insert(name);
+      LOG_INFO("insert %s", name.c_str());
+    }
+  }
+  void append_cell(const AggregateExpr *exp) {
+    const auto name = dynamic_cast<const FieldExpr *>(dynamic_cast<const AggregateExpr *>(exp)->child().get())->table_name();
+    append_cell(TupleCellSpec(name, exp->name(), exp->name(), false));
+    table_names_.insert(name);
+  }
+  void append_cell(const FieldExpr *exp) {
+    append_cell(TupleCellSpec(exp->table_name(), exp->name(), exp->name()));
+    table_names_.insert(exp->table_name());
+    LOG_INFO("insert %s", exp->table_name());
+  }
+
   int  cell_num() const { return static_cast<int>(cells_.size()); }
 
   const TupleCellSpec &cell_at(int i) const { return cells_[i]; }
 
+  bool hasMultipleTable() const { return table_names_.size() > 1; }
+
 private:
   std::vector<TupleCellSpec> cells_;
+  std::unordered_set<std::string> table_names_;
 };
 
 /**

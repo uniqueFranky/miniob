@@ -19,7 +19,7 @@ UpdateStmt::UpdateStmt(Table *table, const std::string &attribute_name, Value *v
     : table_(table), values_(values), value_amount_(value_amount), filter_stmt_(filter_stmt), attribute_name_(attribute_name)
 {}
 
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   // TODO
   Table *table = db->find_table(update.relation_name.c_str());

@@ -102,7 +102,17 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   std::vector<ConditionSqlNode> simple_conditions;
   std::vector<ConditionSqlNode> sub_query_conditions;
   for(auto &condition: select_sql.conditions) {
-    if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
+    if(condition.left_type == ConditionSqlNode::SideType::Expr) {
+      vector<unique_ptr<Expression>> bound;
+      expression_binder.bind_expression(condition.left_expression, bound);
+      condition.left_expression = std::move(bound.front());
+    }
+    if(condition.right_type == ConditionSqlNode::SideType::Expr) {
+      vector<unique_ptr<Expression>> bound;
+      expression_binder.bind_expression(condition.right_expression, bound);
+      condition.right_expression = std::move(bound.front());
+    }
+    if(condition.left_type == ConditionSqlNode::SideType::SubQuery || condition.right_type == ConditionSqlNode::SideType::SubQuery) {
       sub_query_conditions.emplace_back(std::move(condition));
       LOG_INFO("sub query");
     } else {

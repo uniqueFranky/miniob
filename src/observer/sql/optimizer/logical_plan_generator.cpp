@@ -178,48 +178,28 @@ RC LogicalPlanGenerator::create_plan(SimpleFilterStmt *filter_stmt, unique_ptr<L
 {
   RC                                  rc = RC::SUCCESS;
   std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit<SimpleFilterObj> *>    &filter_units = filter_stmt->filter_units();
-  for (const FilterUnit<SimpleFilterObj> *filter_unit : filter_units) {
-    const SimpleFilterObj &filter_obj_left  = filter_unit->left();
-    const SimpleFilterObj &filter_obj_right = filter_unit->right();
+  std::vector<FilterUnit<SimpleFilterObj> *>    &filter_units = filter_stmt->filter_units();
+  for (FilterUnit<SimpleFilterObj> *&filter_unit : filter_units) {
 
-    unique_ptr<Expression> left;
-    unique_ptr<Expression> right;
+    unique_ptr<Expression> left = std::move(filter_unit->left().expr);
+    unique_ptr<Expression> right = std::move(filter_unit->right().expr);
 
-    /* type casting for null values */
-    if(filter_obj_left.is_attr && !filter_obj_right.is_attr && filter_obj_right.value.is_null()) {
-      Value right_value;
-      right_value.set_null(filter_obj_left.field.attr_type());
-      right = make_unique<ValueExpr>(right_value);
-      left = make_unique<FieldExpr>(filter_obj_left.field);
-    } else if(filter_obj_right.is_attr && !filter_obj_left.is_attr && filter_obj_left.value.is_null()) {
-      Value left_value;
-      left_value.set_null(filter_obj_right.field.attr_type());
-      left = make_unique<ValueExpr>(left_value);
-      right = make_unique<FieldExpr>(filter_obj_right.field);
-    } else if(!filter_obj_left.is_attr && !filter_obj_right.is_attr) {
-      left = make_unique<ValueExpr>(filter_obj_left.value);
-      right = make_unique<ValueExpr>(filter_obj_right.value);
-      if(filter_obj_left.value.is_null()) {
-        Value left_value;
-        left_value.set_null(filter_obj_right.value.attr_type());
-        left = make_unique<ValueExpr>(left_value);
-      } else if(filter_obj_right.value.is_null()) {
-        Value right_value;
-        right_value.set_null(filter_obj_left.value.attr_type());
-        right = make_unique<ValueExpr>(right_value);
+    // null value type setting
+    if(left->type() == ExprType::VALUE) {
+      ValueExpr *ve = static_cast<ValueExpr *>(left.get());
+      Value v = ve->get_value();
+      if(v.is_null()) {
+        v.set_type(right->value_type());
+        left = std::make_unique<ValueExpr>(v);
       }
-    } else {
-      /* no null values need to be cast */
-      if(filter_obj_left.is_attr) {
-        left = make_unique<FieldExpr>(filter_obj_left.field);
-      } else {
-        left = make_unique<ValueExpr>(filter_obj_left.value);
-      }
-      if(filter_obj_right.is_attr) {
-        right = make_unique<FieldExpr>(filter_obj_right.field);
-      } else {
-        right = make_unique<ValueExpr>(filter_obj_right.value);
+    }
+    if(right->type() == ExprType::VALUE) {
+      LOG_INFO("right is a value");
+      ValueExpr *ve = static_cast<ValueExpr *>(right.get());
+      Value v = ve->get_value();
+      if(v.is_null()) {
+        v.set_type((left->value_type()));
+        right = std::make_unique<ValueExpr>(v);
       }
     }
 
@@ -283,12 +263,12 @@ RC LogicalPlanGenerator::create_plan(SubQueryFilterStmt *filter_stmt, std::uniqu
   logical_operator = std::move(last_oper);
   for(const auto &unit: filter_stmt->filter_units()) {
     std::unique_ptr<SubQueryPredicateLogicalOperator> op = std::make_unique<SubQueryPredicateLogicalOperator>(unit->comp());
-    if(unit->left().is_attr == false && unit->right().is_attr == false) { // 暂不支持两边都是subquery
+    if(unit->left().is_expr == false && unit->right().is_expr == false) { // 暂不支持两边都是subquery
       return RC::INVALID_ARGUMENT;
     }
 
     std::unique_ptr<LogicalOperator> sub_query;
-    if(unit->left().is_attr == false) {
+    if(unit->left().is_expr == false) {
       rc = create_plan(dynamic_cast<SelectStmt *>(unit->left().sub_query.get()), sub_query);
       if(OB_FAIL(rc)) {
         return rc;
@@ -297,7 +277,7 @@ RC LogicalPlanGenerator::create_plan(SubQueryFilterStmt *filter_stmt, std::uniqu
       op->add_child(std::move(sub_query));
       // 下层算子返回的oper
       op->add_child(std::move(logical_operator));
-      op->set_field(false, unit->right().field);
+      op->set_field(false, static_cast<FieldExpr *>(unit->right().expr.get())->field());
     } else {
       rc = create_plan(dynamic_cast<SelectStmt *>(unit->right().sub_query.get()), sub_query);
       if(OB_FAIL(rc)) {
@@ -307,7 +287,7 @@ RC LogicalPlanGenerator::create_plan(SubQueryFilterStmt *filter_stmt, std::uniqu
       op->add_child(std::move(logical_operator));
       // sub-query返回的tuple
       op->add_child(std::move(sub_query));
-      op->set_field(true, unit->left().field);
+      op->set_field(true, static_cast<FieldExpr *>(unit->left().expr.get())->field());
     }
 
     // 更新返回的结果

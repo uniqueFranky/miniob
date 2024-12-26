@@ -310,6 +310,53 @@ ArithmeticExpr::ArithmeticExpr(ArithmeticExpr::Type type, unique_ptr<Expression>
     : arithmetic_type_(type), left_(std::move(left)), right_(std::move(right))
 {}
 
+RC ArithmeticExpr::calculate_table_names()
+{
+  RC rc = RC::SUCCESS;
+  if(table_names_.size() > 0) {
+    return rc;
+  }
+  switch (left_->type()) {
+    case ExprType::FIELD:
+      table_names_.insert(static_cast<FieldExpr *>(left_.get())->table_name());
+      break;
+    case ExprType::VALUE:
+      break;
+    case ExprType::ARITHMETIC:
+      rc = static_cast<ArithmeticExpr *>(left_.get())->calculate_table_names();
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      for(const auto &name: static_cast<ArithmeticExpr *>(left_.get())->table_names_) {
+        table_names_.insert(name);
+      }
+      break;
+    default:
+      LOG_ERROR("Unexpected left child type of Arithmetic Expression");
+  }
+  if(!right_) {
+    return rc;
+  }
+  switch (right_->type()) {
+    case ExprType::FIELD:
+      table_names_.insert(static_cast<FieldExpr *>(right_.get())->table_name());
+      break;
+    case ExprType::VALUE:
+      break;
+    case ExprType::ARITHMETIC:
+      rc = static_cast<ArithmeticExpr *>(right_.get())->calculate_table_names();
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      for(const auto &name: static_cast<ArithmeticExpr *>(right_.get())->table_names_) {
+        table_names_.insert(name);
+      }      break;
+    default:
+      LOG_ERROR("Unexpected right child type of Arithmetic Expression");
+  }
+  return rc;
+}
+
 bool ArithmeticExpr::equal(const Expression &other) const
 {
   if (this == &other) {
@@ -319,8 +366,16 @@ bool ArithmeticExpr::equal(const Expression &other) const
     return false;
   }
   auto &other_arith_expr = static_cast<const ArithmeticExpr &>(other);
-  return arithmetic_type_ == other_arith_expr.arithmetic_type() && left_->equal(*other_arith_expr.left_) &&
-         right_->equal(*other_arith_expr.right_);
+  if((right_ && !other_arith_expr.right_) || (!right_ && other_arith_expr.right_)) {
+    return false;
+  }
+  if(right_ && other_arith_expr.right_) {
+    return arithmetic_type_ == other_arith_expr.arithmetic_type() && left_->equal(*other_arith_expr.left_) &&
+           right_->equal(*other_arith_expr.right_);
+  } else {
+    return arithmetic_type_ == other_arith_expr.arithmetic_type() && left_->equal(*other_arith_expr.left_);
+  }
+
 }
 AttrType ArithmeticExpr::value_type() const
 {
@@ -452,11 +507,14 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_value(tuple, right_value);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
-    return rc;
+  if(right_) { // unary expressions don't have right
+    rc = right_->get_value(tuple, right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
+
   return calc_value(left_value, right_value, value);
 }
 
@@ -475,10 +533,12 @@ RC ArithmeticExpr::get_column(Chunk &chunk, Column &column)
     LOG_WARN("failed to get column of left expression. rc=%s", strrc(rc));
     return rc;
   }
-  rc = right_->get_column(chunk, right_column);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to get column of right expression. rc=%s", strrc(rc));
-    return rc;
+  if(right_) {
+    rc = right_->get_column(chunk, right_column);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get column of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
   }
   return calc_column(left_column, right_column, column);
 }
