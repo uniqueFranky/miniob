@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "sql/parser/expression_binder.h"
 
 RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
     const RelAttrSqlNode &attr, Table *&table, const FieldMeta *&field)
@@ -48,7 +49,7 @@ RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::str
 }
 
 RC SimpleFilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode *conditions, int condition_num, SimpleFilterStmt *&stmt) {
+    ConditionSqlNode *conditions, int condition_num, SimpleFilterStmt *&stmt) {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;
 
@@ -70,7 +71,7 @@ RC SimpleFilterStmt::create(Db *db, Table *default_table, std::unordered_map<std
 }
 
 RC SimpleFilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode &condition, FilterUnit<SimpleFilterObj> *&filter_unit) {
+    ConditionSqlNode &condition, FilterUnit<SimpleFilterObj> *&filter_unit) {
   RC rc = RC::SUCCESS;
 
   CompOp comp = condition.comp;
@@ -80,61 +81,16 @@ RC SimpleFilterStmt::create_filter_unit(Db *db, Table *default_table, std::unord
   }
 
   filter_unit = new FilterUnit<SimpleFilterObj>;
-
-  switch(condition.left_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      Table           *table = nullptr;
-      const FieldMeta *field = nullptr;
-      rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
-        return rc;
-      }
-      SimpleFilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_left(filter_obj);
-    } break;
-    case ConditionSqlNode::SideType::VALUE: {
-      SimpleFilterObj filter_obj;
-      filter_obj.init_value(condition.left_value);
-      filter_unit->set_left(filter_obj);
-    } break;
-    default: {
-      return RC::INVALID_ARGUMENT;
-    }
-  }
-
-  switch(condition.right_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      Table           *table = nullptr;
-      const FieldMeta *field = nullptr;
-      rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
-        return rc;
-      }
-      SimpleFilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_right(filter_obj);
-    } break;
-    case ConditionSqlNode::SideType::VALUE: {
-      SimpleFilterObj filter_obj;
-      filter_obj.init_value(condition.right_value);
-      filter_unit->set_right(filter_obj);
-    } break;
-    default: {
-      return RC::INVALID_ARGUMENT;
-    }
-  }
-
+  filter_unit->set_left(SimpleFilterObj(std::move(condition.left_expression)));
   filter_unit->set_comp(comp);
+  filter_unit->set_right(SimpleFilterObj(std::move(condition.right_expression)));
 
   // 检查两个类型是否能够比较
   return rc;
 }
 
 RC SubQueryFilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode *conditions, int condition_num, SubQueryFilterStmt *&stmt) {
+    ConditionSqlNode *conditions, int condition_num, SubQueryFilterStmt *&stmt) {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;
 
@@ -156,7 +112,7 @@ RC SubQueryFilterStmt::create(Db *db, Table *default_table, std::unordered_map<s
 }
 
 RC SubQueryFilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const ConditionSqlNode &condition, FilterUnit<SubQueryFilterObj> *&filter_unit) {
+    ConditionSqlNode &condition, FilterUnit<SubQueryFilterObj> *&filter_unit) {
   RC rc = RC::SUCCESS;
 
   CompOp comp = condition.comp;
@@ -168,27 +124,16 @@ RC SubQueryFilterStmt::create_filter_unit(Db *db, Table *default_table, std::uno
   filter_unit = new FilterUnit<SubQueryFilterObj>;
 
   switch(condition.left_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      Table           *table = nullptr;
-      const FieldMeta *field = nullptr;
-      rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
-        return rc;
-      }
-      SubQueryFilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_left(std::move(filter_obj));
+    case ConditionSqlNode::SideType::Expr: {
+      filter_unit->set_left(SubQueryFilterObj(std::move(condition.left_expression)));
     } break;
-    case ConditionSqlNode::SideType::SUBQUERY: {
-      SubQueryFilterObj filter_obj;
+    case ConditionSqlNode::SideType::SubQuery: {
       Stmt *sub_query;
       rc = SelectStmt::create(db, *condition.left_sub_query, sub_query);
       if(OB_FAIL(rc)) {
         return rc;
       }
-      filter_obj.init_sub_query(std::unique_ptr<Stmt>(sub_query));
-      filter_unit->set_left(std::move(filter_obj));
+      filter_unit->set_left(SubQueryFilterObj(std::unique_ptr<Stmt>(sub_query)));
     } break;
     default: {
       return RC::INVALID_ARGUMENT;
@@ -196,27 +141,16 @@ RC SubQueryFilterStmt::create_filter_unit(Db *db, Table *default_table, std::uno
   }
 
   switch(condition.right_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      Table           *table = nullptr;
-      const FieldMeta *field = nullptr;
-      rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-      if (rc != RC::SUCCESS) {
-        LOG_WARN("cannot find attr");
-        return rc;
-      }
-      SubQueryFilterObj filter_obj;
-      filter_obj.init_attr(Field(table, field));
-      filter_unit->set_right(std::move(filter_obj));
+    case ConditionSqlNode::SideType::Expr: {
+      filter_unit->set_right(SubQueryFilterObj(std::move(condition.right_expression)));
     } break;
-    case ConditionSqlNode::SideType::SUBQUERY: {
-      SubQueryFilterObj filter_obj;
+    case ConditionSqlNode::SideType::SubQuery: {
       Stmt *sub_query;
       rc = SelectStmt::create(db, *condition.right_sub_query, sub_query);
       if(OB_FAIL(rc)) {
         return rc;
       }
-      filter_obj.init_sub_query(std::unique_ptr<Stmt>(sub_query));
-      filter_unit->set_right(std::move(filter_obj));
+      filter_unit->set_right(SubQueryFilterObj(std::unique_ptr<Stmt>(sub_query)));
     } break;
     default: {
       return RC::INVALID_ARGUMENT;

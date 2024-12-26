@@ -57,63 +57,67 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
 
 RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
 {
-  const TableMeta &table_meta = table.table_meta();
-  ConDesc          left;
-  ConDesc          right;
+  // 这个函数好像没啥用。。。
+  return RC::UNIMPLEMENTED;
 
-  AttrType type_left  = AttrType::UNDEFINED;
-  AttrType type_right = AttrType::UNDEFINED;
+//  const TableMeta &table_meta = table.table_meta();
+//  ConDesc          left;
+//  ConDesc          right;
+//
+//  AttrType type_left  = AttrType::UNDEFINED;
+//  AttrType type_right = AttrType::UNDEFINED;
 
-  switch(condition.left_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      left.is_attr                = true;
-      const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
-      if (nullptr == field_left) {
-        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
-        return RC::SCHEMA_FIELD_MISSING;
-      }
-      left.attr_length = field_left->len();
-      left.attr_offset = field_left->offset();
 
-      type_left = field_left->type();
-    } break;
-    case ConditionSqlNode::SideType::VALUE: {
-      left.is_attr = false;
-      left.value   = condition.left_value;  // 校验type 或者转换类型
-      type_left    = condition.left_value.attr_type();
-
-      left.attr_length = 0;
-      left.attr_offset = 0;
-    } break;
-    default: {
-      return RC::INVALID_ARGUMENT;
-    }
-  }
-
-  switch(condition.right_type) {
-    case ConditionSqlNode::SideType::ATTRIBUTE: {
-      right.is_attr                = true;
-      const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
-      if (nullptr == field_right) {
-        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
-        return RC::SCHEMA_FIELD_MISSING;
-      }
-      right.attr_length = field_right->len();
-      right.attr_offset = field_right->offset();
-      type_right        = field_right->type();
-    } break;
-    case ConditionSqlNode::SideType::VALUE: {
-      right.is_attr = false;
-      right.value   = condition.right_value;
-      type_right    = condition.right_value.attr_type();
-
-      right.attr_length = 0;
-      right.attr_offset = 0;
-    }
-    default: {
-      return RC::INVALID_ARGUMENT;
-    }
-  }
+//  switch(condition.left_type) {
+//    case ConditionSqlNode::SideType::ATTRIBUTE: {
+//      left.is_attr                = true;
+//      const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
+//      if (nullptr == field_left) {
+//        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
+//        return RC::SCHEMA_FIELD_MISSING;
+//      }
+//      left.attr_length = field_left->len();
+//      left.attr_offset = field_left->offset();
+//
+//      type_left = field_left->type();
+//    } break;
+//    case ConditionSqlNode::SideType::VALUE: {
+//      left.is_attr = false;
+//      left.value   = condition.left_value;  // 校验type 或者转换类型
+//      type_left    = condition.left_value.attr_type();
+//
+//      left.attr_length = 0;
+//      left.attr_offset = 0;
+//    } break;
+//    default: {
+//      return RC::INVALID_ARGUMENT;
+//    }
+//  }
+//
+//  switch(condition.right_type) {
+//    case ConditionSqlNode::SideType::ATTRIBUTE: {
+//      right.is_attr                = true;
+//      const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
+//      if (nullptr == field_right) {
+//        LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
+//        return RC::SCHEMA_FIELD_MISSING;
+//      }
+//      right.attr_length = field_right->len();
+//      right.attr_offset = field_right->offset();
+//      type_right        = field_right->type();
+//    } break;
+//    case ConditionSqlNode::SideType::VALUE: {
+//      right.is_attr = false;
+//      right.value   = condition.right_value;
+//      type_right    = condition.right_value.attr_type();
+//
+//      right.attr_length = 0;
+//      right.attr_offset = 0;
+//    }
+//    default: {
+//      return RC::INVALID_ARGUMENT;
+//    }
+//  }
 
   // 校验和转换
   //  if (!field_type_compare_compatible_table[type_left][type_right]) {
@@ -122,11 +126,11 @@ RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
   //  }
   // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
   // 但是选手们还是要实现。这个功能在预选赛中会出现
-  if (type_left != type_right) {
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-  }
-
-  return init(left, right, type_left, condition.comp);
+//  if (type_left != type_right) {
+//    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+//  }
+//
+//  return init(left, right, type_left, condition.comp);
 }
 
 bool DefaultConditionFilter::filter(const Record &rec) const

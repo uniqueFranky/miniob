@@ -44,9 +44,8 @@ RC FloatType::multiply(const Value &left, const Value &right, Value &result) con
 RC FloatType::divide(const Value &left, const Value &right, Value &result) const
 {
   if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
-    // NOTE:
-    // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
-    result.set_float(numeric_limits<float>::max());
+    // fix: x/0 设置成NULL
+    result.set_null(AttrType::FLOATS);
   } else {
     result.set_float(left.get_float() / right.get_float());
   }

@@ -200,13 +200,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
 
-  bool multiple_table = false;
-  for(int i = 1; i < cell_num; i++) {
-    const char *name1 = schema.cell_at(i).table_name();
-    const char *name2 = schema.cell_at(i - 1).table_name();
-    multiple_table |= (strcmp(name1, name2) != 0);
-    // LOG_DEBUG("name1: %s, name2: %s, multiple_table: %d", name1, name2, multiple_table);
-  }
+  bool multiple_table = schema.hasMultipleTable();
 
   for (int i = 0; i < cell_num; i++) {
     const TupleCellSpec &spec  = schema.cell_at(i);

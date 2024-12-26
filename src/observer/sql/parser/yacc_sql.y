@@ -500,9 +500,17 @@ value:
       $$ = new Value((int)$1);
       @$ = @1;
     }
+    | '-' NUMBER {
+        $$ = new Value((int)-$2);
+        @$ = @2;
+    }
     |FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
+    }
+    | '-' FLOAT {
+        $$ = new Value((float)-$2);
+        @$ = @2;
     }
     |SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
@@ -735,77 +743,32 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
-      $$->left_attr = *$1;
-      $$->right_type = ConditionSqlNode::SideType::VALUE;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op value 
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_type = ConditionSqlNode::SideType::VALUE;
-      $$->left_value = *$1;
-      $$->right_type = ConditionSqlNode::SideType::VALUE;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
-      $$->left_attr = *$1;
-      $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_type = ConditionSqlNode::SideType::VALUE;
-      $$->left_value = *$1;
-      $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op LBRACE sub_query_select_stmt RBRACE
+    expression comp_op expression
     {
         $$ = new ConditionSqlNode;
-        $$->left_type = ConditionSqlNode::SideType::ATTRIBUTE;
-        $$->left_attr = *$1;
+        $$->left_type = ConditionSqlNode::SideType::Expr;
+        $$->left_expression = std::unique_ptr<Expression>($1);
         $$->comp = $2;
-        $$->right_type = ConditionSqlNode::SideType::SUBQUERY;
-        $$->right_sub_query = std::unique_ptr<SelectSqlNode>($4);
-
-        delete $1;
-        // do not delete $4;
+        $$->right_type = ConditionSqlNode::SideType::Expr;
+        $$->right_expression = std::unique_ptr<Expression>($3);
     }
-    | LBRACE sub_query_select_stmt RBRACE comp_op rel_attr
+    | expression comp_op LBRACE sub_query_select_stmt RBRACE
     {
         $$ = new ConditionSqlNode;
-        $$->left_type = ConditionSqlNode::SideType::SUBQUERY;
+        $$->left_type = ConditionSqlNode::SideType::Expr;
+        $$->left_expression = std::unique_ptr<Expression>($1);
+        $$->comp = $2;
+        $$->right_type = ConditionSqlNode::SideType::SubQuery;
+        $$->right_sub_query = std::unique_ptr<SelectSqlNode>($4);
+    }
+    | LBRACE sub_query_select_stmt RBRACE comp_op expression
+    {
+        $$ = new ConditionSqlNode;
+        $$->left_type = ConditionSqlNode::SideType::SubQuery;
         $$->left_sub_query = std::unique_ptr<SelectSqlNode>($2);
         $$->comp = $4;
-        $$->right_type = ConditionSqlNode::SideType::ATTRIBUTE;
-        $$->right_attr = *$5;
-
-        delete $5;
-        // do not delete $2;
+        $$->right_type = ConditionSqlNode::SideType::Expr;
+        $$->right_expression = std::unique_ptr<Expression>($5);
     }
     ;
 

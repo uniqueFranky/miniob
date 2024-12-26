@@ -75,10 +75,11 @@ QUOTE            [\'\"]
 %%
 
 {WHITE_SPACE}                                        // ignore whitespace
-\n                                                   ;
+\n                                                   ; /* negative numbers should be handled in grammar, otherwise it will confuse 'col1-1' as 'col1' and '-1' */
 
-[\-]?{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
-[\-]?{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+
+{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
+{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
 
 ";"                                     RETURN_TOKEN(SEMICOLON);
 {DOT}                                   RETURN_TOKEN(DOT);

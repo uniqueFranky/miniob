@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "common/value.h"
 #include "storage/field/field.h"
@@ -386,10 +387,14 @@ public:
 
   RC try_get_value(Value &value) const override;
 
+  const std::unordered_set<std::string> &table_names() const { return table_names_; }
+
   Type arithmetic_type() const { return arithmetic_type_; }
 
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }
+
+  RC calculate_table_names();
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
@@ -403,6 +408,8 @@ private:
   Type                        arithmetic_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+
+  std::unordered_set<std::string>  table_names_;
 };
 
 class UnboundAggregateExpr : public Expression
