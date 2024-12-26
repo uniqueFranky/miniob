@@ -142,7 +142,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
           return rc;
         }
         if (inner_join_predicates_oper) {
-          // LOG_DEBUG("The %d-th relations_tables[%d] inner join predicate", i, j);
+          LOG_DEBUG("The %d-th relations_tables[%d] inner join predicate, filter_units size = %d", i, j, relations_simple_filter_stmts[i][j - 1]->filter_units().size());
           inner_join_predicates_oper->add_child(std::move(inner_join_table_oper));
           inner_join_table_oper = std::move(inner_join_predicates_oper);
         }

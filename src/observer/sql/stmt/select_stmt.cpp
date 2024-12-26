@@ -52,6 +52,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     // NOTE: std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode>>>> SelectSqlNode::relations
+    BinderContext inner_binder_context;
     vector<Table *> inner_join_tables;
     unordered_map<string, Table *> inner_join_table_map;
     vector<SimpleFilterStmt *> inner_join_simple_filter_stmts;
@@ -71,6 +72,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       }
 
       binder_context.add_table(table);
+      inner_binder_context.add_table(table);
       tables.push_back(table);
       table_map.insert({table_name, table});
 
@@ -83,7 +85,24 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         // 之所以不和 where 一起处理，是因为 where 是先将所有表 join 再做 filter，会超时
         std::vector<ConditionSqlNode> inner_simple_conditions;
         std::vector<ConditionSqlNode> inner_sub_query_conditions;
+        ExpressionBinder inner_expression_binder(inner_binder_context);
         for (auto &condition: select_sql.relations[i][j].second) {
+          if(condition.left_type == ConditionSqlNode::SideType::Expr) {
+            vector<unique_ptr<Expression>> bound;
+            rc = inner_expression_binder.bind_expression(condition.left_expression, bound);
+            if(OB_FAIL(rc)) {
+              return rc;
+            }
+            condition.left_expression = std::move(bound.front());
+          }
+          if(condition.right_type == ConditionSqlNode::SideType::Expr) {
+            vector<unique_ptr<Expression>> bound;
+            rc = inner_expression_binder.bind_expression(condition.right_expression, bound);
+            if(OB_FAIL(rc)) {
+              return rc;
+            }
+            condition.right_expression = std::move(bound.front());
+          }
           if(condition.left_type == ConditionSqlNode::SideType::SubQuery || condition.right_type == ConditionSqlNode::SideType::SubQuery) {
             inner_sub_query_conditions.emplace_back(std::move(condition));
           } else {
@@ -204,6 +223,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         if (inner_join_table_map.find(fieldExpr->field().table_name()) != inner_join_table_map.end()) {
           rc = RC::SUCCESS;
         }
+        else rc = RC::INVALID_ARGUMENT;
       } else if (expr->type() == ExprType::VALUE) {
         rc = RC::SUCCESS;
       } else {
@@ -231,7 +251,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
             continue;
           }
           relations_simple_filter_stmts[i][j - 1]->push_back_filter_unit(filter_unit);
-          LOG_DEBUG("move filter unit %d to table %d", k, j - 1);
+          LOG_DEBUG("move filter unit %d to table %d, table_name %s", k, j - 1, inner_join_tables[j]->name());
           filter_moved[k] = 1;
         }
       }
@@ -243,6 +263,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       filter_units->erase(filter_units->begin() + i - 1);
     }
   }
+  LOG_DEBUG("filter units size %d", filter_units->size());
 
   // create sub query filter statement in `where` statement
   SubQueryFilterStmt *sub_query_filter_stmt = nullptr;
