@@ -59,7 +59,7 @@ public:
     append_cell(TupleCellSpec(nullptr, nullptr, exp->name(), false));
     for(const auto &name: exp->table_names()) {
       table_names_.insert(name);
-      LOG_INFO("insert %s", name.c_str());
+      // LOG_INFO("insert %s", name.c_str());
     }
   }
   void append_cell(const AggregateExpr *exp) {
@@ -70,7 +70,7 @@ public:
   void append_cell(const FieldExpr *exp) {
     append_cell(TupleCellSpec(exp->table_name(), exp->name(), exp->name()));
     table_names_.insert(exp->table_name());
-    LOG_INFO("insert %s", exp->table_name());
+    // LOG_INFO("insert %s", exp->table_name());
   }
 
   int  cell_num() const { return static_cast<int>(cells_.size()); }

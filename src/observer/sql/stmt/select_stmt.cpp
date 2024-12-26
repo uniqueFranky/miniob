@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 #include "sql/parser/expression_binder.h"
+#include <sql/expr/expression_iterator.h>
 
 using namespace std;
 using namespace common;
@@ -38,6 +39,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
+  RC rc = RC::SUCCESS;
   BinderContext binder_context;
 
   // collect tables in `from` statement
@@ -79,24 +81,24 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         // sikp the zeroth table because the conditions mean the join conditions between the j-th table and the former table
         // create filter statement for inner join
         // 之所以不和 where 一起处理，是因为 where 是先将所有表 join 再做 filter，会超时
-        std::vector<ConditionSqlNode> simple_conditions;
-        std::vector<ConditionSqlNode> sub_query_conditions;
+        std::vector<ConditionSqlNode> inner_simple_conditions;
+        std::vector<ConditionSqlNode> inner_sub_query_conditions;
         for (auto &condition: select_sql.relations[i][j].second) {
           if(condition.left_type == ConditionSqlNode::SideType::SubQuery || condition.right_type == ConditionSqlNode::SideType::SubQuery) {
-            sub_query_conditions.emplace_back(std::move(condition));
+            inner_sub_query_conditions.emplace_back(std::move(condition));
           } else {
-            simple_conditions.emplace_back(std::move(condition));
+            inner_simple_conditions.emplace_back(std::move(condition));
           }
         }
         SimpleFilterStmt *simple_filter_stmt = nullptr;
-        RC rc = SimpleFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, simple_conditions.data(), static_cast<int>(simple_conditions.size()), simple_filter_stmt);
+        rc = SimpleFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, inner_simple_conditions.data(), static_cast<int>(inner_simple_conditions.size()), simple_filter_stmt);
         if (OB_FAIL(rc)) {
           LOG_WARN("cannot construct filter stmt for inner join");
           return rc;
         }
         inner_join_simple_filter_stmts.push_back(simple_filter_stmt);
         SubQueryFilterStmt *sub_query_filter_stmt = nullptr;
-        rc = SubQueryFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, sub_query_conditions.data(), static_cast<int>(sub_query_conditions.size()), sub_query_filter_stmt);
+        rc = SubQueryFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, inner_sub_query_conditions.data(), static_cast<int>(inner_sub_query_conditions.size()), sub_query_filter_stmt);
         if(OB_FAIL(rc)) {
           LOG_WARN("cannot construct sub query filter stmt for inner join");
           return rc;
@@ -115,7 +117,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   ExpressionBinder expression_binder(binder_context);
   
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
-    RC rc = expression_binder.bind_expression(expression, bound_expressions);
+    rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
@@ -124,7 +126,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
-    RC rc = expression_binder.bind_expression(expression, group_by_expressions);
+    rc = expression_binder.bind_expression(expression, group_by_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
@@ -134,7 +136,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<unique_ptr<Expression>> order_by_expressions;
   vector<OrderBySqlNode::OrderType> order_by_types;
   for(OrderBySqlNode &order_by_sql_node: select_sql.order_by) {
-    RC rc = expression_binder.bind_expression(order_by_sql_node.expr, order_by_expressions);
+    rc = expression_binder.bind_expression(order_by_sql_node.expr, order_by_expressions);
     order_by_types.emplace_back(order_by_sql_node.order_type);
     if(OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
@@ -147,7 +149,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  RC rc = RC::SUCCESS;
   std::vector<ConditionSqlNode> simple_conditions;
   std::vector<ConditionSqlNode> sub_query_conditions;
   for(auto &condition: select_sql.conditions) {
@@ -187,6 +188,60 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
+  }
+
+  std::vector<FilterUnit<SimpleFilterObj> *> * filter_units = &simple_filter_stmt->filter_units();
+  std::vector<int> filter_moved(filter_units->size(), 0); // 0 means not moved, 1 means moved
+  
+  for (size_t i = 0; i < select_sql.relations.size(); i++) {
+    vector<Table *> inner_join_tables;
+    unordered_map<string, Table *> inner_join_table_map;
+
+    std::function<RC(std::unique_ptr<Expression>&)> can_move = [&](std::unique_ptr<Expression> &expr) -> RC {
+      RC rc = RC::SUCCESS;
+      if (expr->type() == ExprType::FIELD) {
+        FieldExpr *fieldExpr = static_cast<FieldExpr *>(expr.get());
+        if (inner_join_table_map.find(fieldExpr->field().table_name()) != inner_join_table_map.end()) {
+          rc = RC::SUCCESS;
+        }
+      } else if (expr->type() == ExprType::VALUE) {
+        rc = RC::SUCCESS;
+      } else {
+        rc = ExpressionIterator::iterate_child_expr(*expr, can_move);
+      }
+      return rc;
+    };
+
+    for (size_t j = 0; j < select_sql.relations[i].size(); ++ j) {
+      inner_join_tables.push_back(relations_tables[i][j]);
+      inner_join_table_map.insert({select_sql.relations[i][j].first, relations_tables[i][j]});
+      if (j > 0) {
+        for (size_t k = 0; k < filter_units->size(); ++ k) {
+          // try to move the filter unit into former table's filter stmt
+          if (filter_moved[k] == 1) {
+            continue;
+          }
+          FilterUnit<SimpleFilterObj> *filter_unit = (*filter_units)[k];
+          RC rc = can_move(filter_unit->left().expr);
+          if (OB_FAIL(rc)) {
+            continue;
+          }
+          rc = can_move(filter_unit->right().expr);
+          if (OB_FAIL(rc)) {
+            continue;
+          }
+          relations_simple_filter_stmts[i][j - 1]->push_back_filter_unit(filter_unit);
+          LOG_DEBUG("move filter unit %d to table %d", k, j - 1);
+          filter_moved[k] = 1;
+        }
+      }
+    }
+  }
+
+  for (size_t i = filter_moved.size(); i > 0; -- i) {
+    if (filter_moved[i - 1] == 1) {
+      filter_units->erase(filter_units->begin() + i - 1);
+    }
   }
 
   // create sub query filter statement in `where` statement

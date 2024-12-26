@@ -115,6 +115,9 @@ public:
       ConditionSqlNode *conditions, int condition_num, SimpleFilterStmt *&stmt);
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
       ConditionSqlNode &condition, FilterUnit<SimpleFilterObj> *&filter_unit);
+  void push_back_filter_unit(FilterUnit<SimpleFilterObj> *unit) {
+    filter_units_.push_back(std::move(unit));
+  }
 };
 
 class SubQueryFilterStmt: public FilterStmt<SubQueryFilterObj> {
