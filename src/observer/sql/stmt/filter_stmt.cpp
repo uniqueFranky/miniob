@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/rc.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
+#include "sql/parser/expression_binder.h"
 
 RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
     const RelAttrSqlNode &attr, Table *&table, const FieldMeta *&field)
@@ -141,7 +142,7 @@ RC SubQueryFilterStmt::create_filter_unit(Db *db, Table *default_table, std::uno
 
   switch(condition.right_type) {
     case ConditionSqlNode::SideType::Expr: {
-      filter_unit->set_left(SubQueryFilterObj(std::move(condition.right_expression)));
+      filter_unit->set_right(SubQueryFilterObj(std::move(condition.right_expression)));
     } break;
     case ConditionSqlNode::SideType::SubQuery: {
       Stmt *sub_query;
@@ -149,7 +150,7 @@ RC SubQueryFilterStmt::create_filter_unit(Db *db, Table *default_table, std::uno
       if(OB_FAIL(rc)) {
         return rc;
       }
-      filter_unit->set_left(SubQueryFilterObj(std::unique_ptr<Stmt>(sub_query)));
+      filter_unit->set_right(SubQueryFilterObj(std::unique_ptr<Stmt>(sub_query)));
     } break;
     default: {
       return RC::INVALID_ARGUMENT;

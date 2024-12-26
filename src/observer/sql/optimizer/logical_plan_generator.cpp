@@ -264,6 +264,7 @@ RC LogicalPlanGenerator::create_plan(SubQueryFilterStmt *filter_stmt, std::uniqu
   for(const auto &unit: filter_stmt->filter_units()) {
     std::unique_ptr<SubQueryPredicateLogicalOperator> op = std::make_unique<SubQueryPredicateLogicalOperator>(unit->comp());
     if(unit->left().is_expr == false && unit->right().is_expr == false) { // 暂不支持两边都是subquery
+      LOG_ERROR("both sides of query condition is sub query");
       return RC::INVALID_ARGUMENT;
     }
 
