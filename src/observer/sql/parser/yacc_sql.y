@@ -677,9 +677,8 @@ rel_attr:
 relation:
     ID inner_join_list {
       $$ = $2;
-      std::string s = $1;
+      $$->emplace_back($1, std::move(std::vector<ConditionSqlNode>()) );
       free($1);
-      $$->emplace_back(s, std::move(std::vector<ConditionSqlNode>()) );
     }
     ;
 
@@ -690,22 +689,21 @@ inner_join_list:
     }
     | INNER JOIN ID ON condition_list inner_join_list {
       $$ = $6;
-      std::string s = $3;
+      $$->emplace_back($3, std::move(*$5));
       free($3); // char *
-      $$->emplace_back(s, std::move(*$5));
     }
     ;
 
 rel_list:
     relation {
       $$ = new std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode> > > >();
-      // $1->reverse($1->begin(), $1->end());
+      std::reverse($1->begin(), $1->end());
       $$->emplace_back(std::move(*$1));
       // delete $1;
     }
     | relation COMMA rel_list {
       $$ = $3;
-      // $1->reverse($1->begin(), $1->end());
+      std::reverse($1->begin(), $1->end());
       $$->emplace_back(std::move(*$1));
       // delete $1;
     }

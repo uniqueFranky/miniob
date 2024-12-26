@@ -43,8 +43,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // collect tables in `from` statement
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
+  
+  vector<vector<Table *>>             relations_tables;
+  vector<vector<SubQueryFilterStmt *>>  relations_sub_query_filter_stmts;
+  vector<vector<SimpleFilterStmt *>>    relations_simple_filter_stmts;
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     // NOTE: std::vector<std::vector<std::pair<std::string, std::vector<ConditionSqlNode>>>> SelectSqlNode::relations
+    vector<Table *> inner_join_tables;
+    unordered_map<string, Table *> inner_join_table_map;
+    vector<SimpleFilterStmt *> inner_join_simple_filter_stmts;
+    vector<SubQueryFilterStmt *> inner_join_sub_query_filter_stmts;
+
     for (size_t j = 0; j < select_sql.relations[i].size(); ++ j) {
       const char *table_name = select_sql.relations[i][j].first.c_str();
       if (nullptr == table_name) {
@@ -61,7 +71,43 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       binder_context.add_table(table);
       tables.push_back(table);
       table_map.insert({table_name, table});
+
+      inner_join_tables.push_back(table);
+      inner_join_table_map.insert({table_name, table});
+
+      if (j > 0) { // inner join
+        // sikp the zeroth table because the conditions mean the join conditions between the j-th table and the former table
+        // create filter statement for inner join
+        // 之所以不和 where 一起处理，是因为 where 是先将所有表 join 再做 filter，会超时
+        std::vector<ConditionSqlNode> simple_conditions;
+        std::vector<ConditionSqlNode> sub_query_conditions;
+        for (auto &condition: select_sql.relations[i][j].second) {
+          if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
+            sub_query_conditions.emplace_back(std::move(condition));
+          } else {
+            simple_conditions.emplace_back(std::move(condition));
+          }
+        }
+        SimpleFilterStmt *simple_filter_stmt = nullptr;
+        RC rc = SimpleFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, simple_conditions.data(), static_cast<int>(simple_conditions.size()), simple_filter_stmt);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("cannot construct filter stmt for inner join");
+          return rc;
+        }
+        inner_join_simple_filter_stmts.push_back(simple_filter_stmt);
+        SubQueryFilterStmt *sub_query_filter_stmt = nullptr;
+        rc = SubQueryFilterStmt::create(db, inner_join_tables[j - 1], &inner_join_table_map, sub_query_conditions.data(), static_cast<int>(sub_query_conditions.size()), sub_query_filter_stmt);
+        if(OB_FAIL(rc)) {
+          LOG_WARN("cannot construct sub query filter stmt for inner join");
+          return rc;
+        }
+        inner_join_sub_query_filter_stmts.push_back(sub_query_filter_stmt);
+      }
     }
+
+    relations_tables.push_back(std::move(inner_join_tables));
+    relations_simple_filter_stmts.push_back(std::move(inner_join_simple_filter_stmts));
+    relations_sub_query_filter_stmts.push_back(std::move(inner_join_sub_query_filter_stmts));
   }
 
   // collect query fields in `select` statement
@@ -101,32 +147,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-
   std::vector<ConditionSqlNode> simple_conditions;
   std::vector<ConditionSqlNode> sub_query_conditions;
   for(auto &condition: select_sql.conditions) {
     if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
       sub_query_conditions.emplace_back(std::move(condition));
-      LOG_INFO("sub query");
+      // LOG_INFO("sub query");
     } else {
-      LOG_INFO("simple");
+      // LOG_INFO("simple");
       simple_conditions.emplace_back(std::move(condition));
     }
   }
-  // inner join 和 where 本质上是一样的，只是 inner join 会在 from 语句中指定，这里给他们合并处理
-  for (size_t i = 0;i < select_sql.relations.size(); i++) {
-    for (size_t j = 0; j < select_sql.relations[i].size(); ++ j) {
-      for (auto &condition: select_sql.relations[i][j].second) {
-        if(condition.left_type == ConditionSqlNode::SideType::SUBQUERY || condition.right_type == ConditionSqlNode::SideType::SUBQUERY) {
-          sub_query_conditions.emplace_back(std::move(condition));
-          LOG_INFO("sub query");
-        } else {
-          LOG_INFO("simple");
-          simple_conditions.emplace_back(std::move(condition));
-        }
-      }
-    }
-  }
+
   // create simple filter statement in `where` statement
   SimpleFilterStmt *simple_filter_stmt = nullptr;
   RC          rc          = SimpleFilterStmt::create(db,
@@ -157,6 +189,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->order_by_type_.swap(order_by_types);
+  select_stmt->relations_tables_.swap(relations_tables);
+  select_stmt->relations_simple_filter_stmts_.swap(relations_simple_filter_stmts);
+  select_stmt->relations_sub_query_filter_stmts_.swap(relations_sub_query_filter_stmts);
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

@@ -104,16 +104,70 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
 
-  const std::vector<Table *> &tables = select_stmt->tables();
-  for (Table *table : tables) {
+  // const std::vector<Table *> &tables = select_stmt->tables();
+  // for (Table *table : tables) {
 
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+  //   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+  //   if (table_oper == nullptr) {
+  //     table_oper = std::move(table_get_oper);
+  //   } else {
+  //     JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+  //     join_oper->add_child(std::move(table_oper));
+  //     join_oper->add_child(std::move(table_get_oper));
+  //     table_oper = unique_ptr<LogicalOperator>(join_oper);
+  //   }
+  // }
+  const std::vector<std::vector<Table *>> &relations_tables = select_stmt->relations_tables();
+  const std::vector<std::vector<SimpleFilterStmt *>> &relations_simple_filter_stmts = select_stmt->relations_simple_filter_stmts();
+  const std::vector<std::vector<SubQueryFilterStmt *>> &relations_sub_query_filter_stmts = select_stmt->relations_sub_query_filter_stmts();
+
+  for (size_t i = 0; i < relations_tables.size(); i++) {
+    unique_ptr<LogicalOperator> inner_join_table_oper(nullptr);
+    // LOG_DEBUG("The %d-th relations_tables size: %d", i, relations_tables[0].size());
+    for (size_t j = 0; j < relations_tables[i].size(); j++) {
+      unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(relations_tables[i][j], ReadWriteMode::READ_ONLY));
+      if (inner_join_table_oper == nullptr) {
+        inner_join_table_oper = std::move(table_get_oper);
+      } 
+      else { // inner join relations 只有一个表的时候不会进入这个分支
+        JoinLogicalOperator* join_oper = new JoinLogicalOperator;
+        join_oper->add_child(std::move(inner_join_table_oper));
+        join_oper->add_child(std::move(table_get_oper));
+        inner_join_table_oper = unique_ptr<LogicalOperator>(join_oper);
+        unique_ptr<LogicalOperator> inner_join_predicates_oper;
+        // LOG_DEBUG("The %d-th relations_tables[%d] join", i, j);
+        RC rc = create_plan(relations_simple_filter_stmts[i][j - 1], inner_join_predicates_oper); // j - 1 是因为 filter 都是和前一个表的关系
+        if (OB_FAIL(rc)) {  
+          LOG_WARN("failed to create inner join predicates logical plan. rc=%s", strrc(rc));
+          return rc;
+        }
+        if (inner_join_predicates_oper) {
+          // LOG_DEBUG("The %d-th relations_tables[%d] inner join predicate", i, j);
+          inner_join_predicates_oper->add_child(std::move(inner_join_table_oper));
+          inner_join_table_oper = std::move(inner_join_predicates_oper);
+        }
+        unique_ptr<LogicalOperator> inner_join_sub_query_oper;
+        rc = create_plan(relations_sub_query_filter_stmts[i][j - 1], inner_join_table_oper, inner_join_sub_query_oper);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to create inner join sub query logical plan. rc=%s", strrc(rc));
+          return rc;
+        }
+        if (inner_join_sub_query_oper) {
+          // LOG_DEBUG("The %d-th relations_tables[%d] inner join sub query", i, j);
+          // we don't need to add the inner_join_table_oper to inner_join_sub_query_oper here, because it has been added in the create_plan function
+          // inner_join_sub_query_oper->add_child(std::move(inner_join_table_oper));
+          inner_join_table_oper = std::move(inner_join_sub_query_oper);
+        }
+      }
+    }
     if (table_oper == nullptr) {
-      table_oper = std::move(table_get_oper);
+      // LOG_DEBUG("The %d-th relations_tables is the first table", i);
+      table_oper = std::move(inner_join_table_oper);
     } else {
+      // LOG_DEBUG("The %d-th relations_tables is not the first table", i);
       JoinLogicalOperator *join_oper = new JoinLogicalOperator;
       join_oper->add_child(std::move(table_oper));
-      join_oper->add_child(std::move(table_get_oper));
+      join_oper->add_child(std::move(inner_join_table_oper));
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
   }
@@ -130,7 +184,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     if (*last_oper) {
       predicate_oper->add_child(std::move(*last_oper));
     }
-
+    // LOG_DEBUG("The predicate_oper is not null");
     last_oper = &predicate_oper;
   }
 
