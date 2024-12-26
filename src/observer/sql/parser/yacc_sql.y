@@ -685,7 +685,7 @@ rel_attr:
 relation:
     ID inner_join_list {
       $$ = $2;
-      $$->emplace_back($1, std::move(std::vector<ConditionSqlNode>()) );
+      $$->emplace_back($1, std::vector<ConditionSqlNode>());
       free($1);
     }
     ;
