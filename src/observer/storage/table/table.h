@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/types.h"
 #include "common/lang/span.h"
 #include "common/lang/functional.h"
+#include "storage/buffer/frame.h"
 
 struct RID;
 class Record;
@@ -107,6 +108,8 @@ public:
   Db *db() const { return db_; }
 
   const TableMeta &table_meta() const;
+
+  DiskBufferPool *data_buffer_pool() const { return data_buffer_pool_; }
 
   RC sync();
 

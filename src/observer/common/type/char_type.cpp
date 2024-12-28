@@ -38,6 +38,10 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
         return RC::INVALID_ARGUMENT;
       }
     }
+    case AttrType::TEXTS: {
+      // table.cpp 中 make_record 调用这个函数讲 str 转换为 text，直接 do nothing
+      return RC::SUCCESS;
+    }
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;

@@ -199,12 +199,23 @@ void Value::set_string(const char *s, int len /*= 0*/)
     value_.pointer_value_[len] = '\0';
   }
 }
+
 void Value::set_date(const Date_t &val)
 {
   reset();
   attr_type_         = AttrType::DATES;
   value_.date_value_ = val;
   length_            = sizeof(val);
+}
+
+void Value::set_text(PageNum page_num)
+{
+  // text 的 Value 实际上存的是 PageNum 
+  // 如果输入的字符串长度，超过4096，那么应该保存4096字节，剩余的数据截断。
+  reset();
+  attr_type_ = AttrType::TEXTS;
+  value_.page_num_  = page_num;
+  length_ = sizeof(page_num);
 }
 
 void Value::set_null(AttrType type)
