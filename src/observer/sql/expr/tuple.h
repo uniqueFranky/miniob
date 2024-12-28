@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse.h"
 #include "common/value.h"
 #include "storage/record/record.h"
+#include "storage/buffer/disk_buffer_pool.h"
 
 class Table;
 
@@ -221,6 +222,19 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
+    if (field_meta->type() == AttrType::TEXTS) {
+      PageNum page_num = *reinterpret_cast<PageNum *>(record_->data() + field_meta->offset());
+      if (page_num == BP_INVALID_PAGE_NUM) {
+        cell.set_null(AttrType::CHARS);
+        return RC::SUCCESS;
+      }
+      cell.set_type(AttrType::CHARS);
+      DiskBufferPool* dbp = table_->data_buffer_pool();
+      Frame *frame = nullptr;
+      dbp->get_this_page(page_num, &frame);
+      cell.set_data(frame->data(), 4096);
+      return RC::SUCCESS;
+    }
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
     return RC::SUCCESS;

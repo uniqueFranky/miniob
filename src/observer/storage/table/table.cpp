@@ -294,8 +294,12 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             table_meta_.name(), field->name(), value.to_string().c_str());
         break;
       }
-      rc = set_value_to_record(record_data, real_value, field);
-    } else {
+      if (field->type() == AttrType::TEXTS && value.attr_type() == AttrType::CHARS) { // CHAR -> TEXT 不需要 cast
+        rc = set_value_to_record(record_data, value, field);
+      } 
+      else rc = set_value_to_record(record_data, real_value, field);
+    } 
+    else {
       rc = set_value_to_record(record_data, value, field);
     }
   }
@@ -318,7 +322,35 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
       copy_len = data_len + 1;
     }
   }
-  memcpy(record_data + field->offset(), value.data(), copy_len);
+  if (field->type() == AttrType::TEXTS) {
+    if (value.is_null()) {
+      PageNum page_num = BP_INVALID_PAGE_NUM;
+      memcpy(record_data + field->offset(), &page_num, sizeof(PageNum));
+      field->set_field_null_indicator(record_data, true); // set the null indicator byte
+      return RC::SUCCESS;
+    }
+    RC rc = RC::SUCCESS;
+    Frame *frame = nullptr;
+    if ((rc = data_buffer_pool_->allocate_page(&frame)) != RC::SUCCESS) {
+      LOG_ERROR("Failed to allocate page while storaging text. rc:%d", rc);
+      return rc;
+    }
+    
+    frame->pin();
+    LOG_DEBUG("Allocated page num:%d, pin count:%d", frame->page_num(), frame->pin_count());
+    PageNum current_page_num = frame->page_num();
+    // 对于 text 类型，record_data 中存储的是 page_num
+    memcpy(record_data + field->offset(), &current_page_num, sizeof(PageNum));
+    field->set_field_null_indicator(record_data, false); // set the null indicator byte
+
+    memcpy(frame->data(), value.data(), min(size_t(4096), data_len)); // copy the text data to the page
+
+    frame->mark_dirty();
+    frame->unpin();
+  }
+  else {
+    memcpy(record_data + field->offset(), value.data(), copy_len);
+  }
   field->set_field_null_indicator(record_data, value.is_null()); // set the null indicator byte
   return RC::SUCCESS;
 }
@@ -502,6 +534,16 @@ RC Table::delete_record(const Record &record)
     ASSERT(RC::SUCCESS == rc, 
            "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
            name(), index->index_meta().name(), record.rid().to_string().c_str(), strrc(rc));
+  }
+  auto fields = table_meta_.field_metas();
+  for (auto& field : *fields) {
+    if (field.type() == AttrType::TEXTS) {
+      PageNum page_num;
+      memcpy(&page_num, record.data() + field.offset(), sizeof(PageNum));
+      if (page_num != BP_INVALID_PAGE_NUM) {
+        data_buffer_pool_->dispose_page(page_num);
+      }
+    }
   }
   rc = record_handler_->delete_record(&record.rid());
   return rc;

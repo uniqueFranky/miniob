@@ -19,6 +19,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
 #include "common/type/date_type.h"
+#include "common/type/text_type.h"
+#include "common/types.h"
 #include "common/log/log.h"
 
 /**
@@ -37,6 +39,7 @@ public:
   friend class BooleanType;
   friend class CharType;
   friend class DateType;
+  friend class TextType;
 
   Value(): attr_type_(AttrType::UNDEFINED), is_null_(true) {};
 
@@ -140,6 +143,7 @@ public:
   string get_string() const;
   bool   get_boolean() const;
   Date_t get_date() const;
+  string get_text() const;
 
 private:
   void set_int(int val);
@@ -147,6 +151,7 @@ private:
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
   void set_date(const Date_t &date);
+  void set_text(PageNum page_num);
 
 public:
   bool is_null() const;
@@ -164,6 +169,7 @@ private:
     bool    bool_value_;
     char   *pointer_value_;
     Date_t  date_value_;
+    PageNum page_num_;
   } value_ = {.int_value_ = 0};
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
