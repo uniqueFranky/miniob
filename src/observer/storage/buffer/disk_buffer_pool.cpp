@@ -614,6 +614,40 @@ RC DiskBufferPool::write_page(PageNum page_num, Page &page)
   return RC::SUCCESS;
 }
 
+RC DiskBufferPool::append_data(int64_t &offset, int64_t length, const char *data)
+{
+  offset = BP_PAGE_SIZE * file_header_->page_count;
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to write page %lld of %d due to failed to seek %s.", offset, file_desc_, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  if (writen(file_desc_, data, length) != 0) {
+    LOG_ERROR("Failed to write page %lld of %d due to %s.", offset, file_desc_, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+
+  file_header_->page_count += (length + BP_PAGE_SIZE - 1) / BP_PAGE_SIZE;
+
+  return RC::SUCCESS;
+}
+
+RC DiskBufferPool::get_data(int64_t offset, int64_t length, char *data)
+{
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to read page %lld of %d due to failed to seek %s.", offset, file_desc_, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  int ret = readn(file_desc_, data, length);
+  if (ret != 0) {
+    LOG_ERROR("Failed to read page %lld of %d due to %s.", offset, file_desc_, strerror(errno));
+    return RC::IOERR_READ;
+  }
+
+  return RC::SUCCESS;
+}
+
 RC DiskBufferPool::redo_allocate_page(LSN lsn, PageNum page_num)
 {
   if (hdr_frame_->lsn() >= lsn) {
@@ -836,6 +870,23 @@ RC BufferPoolManager::create_file(const char *file_name)
   close(fd);
   LOG_INFO("Successfully create %s.", file_name);
   return RC::SUCCESS;
+}
+
+RC BufferPoolManager::remove_file(const char *file_name)
+{
+  RC rc = RC::SUCCESS;
+  if ((rc = close_file(file_name)) != RC::SUCCESS) {
+    LOG_ERROR("Failed to close file %s. errno=%s", file_name, strrc(rc));
+    return rc;
+  }
+
+  if (filesystem::remove(file_name)) {
+    LOG_INFO("Successfully remove file %s.", file_name);
+    return RC::SUCCESS;
+  }
+
+  LOG_ERROR("Failed to remove file %s. errno=%s", file_name, strerror(errno));
+  return RC::FILE_REMOVE;
 }
 
 RC BufferPoolManager::open_file(LogHandler &log_handler, const char *_file_name, DiskBufferPool *&_bp)

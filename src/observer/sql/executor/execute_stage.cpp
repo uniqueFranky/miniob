@@ -47,11 +47,15 @@ RC ExecuteStage::handle_request(SQLStageEvent *sql_event)
     CommandExecutor command_executor;
     rc = command_executor.execute(sql_event);
     session_event->sql_result()->set_return_code(rc);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to execute command. rc=%s", strrc(rc));
+    }
   } else {
     switch(sql_event->sql_node()->flag) {
       case SCF_DROP_TABLE:
         return session_event->session()->get_current_db()->drop_table(sql_event->sql_node()->drop_table.relation_name.c_str());
       default:
+        LOG_WARN("unsupported sql command flag: %d", sql_event->sql_node()->flag);
         return RC::INTERNAL;
     }
   }

@@ -215,6 +215,7 @@ public:
 
   RC cell_at(int index, Value &cell) const override
   {
+    RC rc = RC::SUCCESS;
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
@@ -223,16 +224,17 @@ public:
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
     if (field_meta->type() == AttrType::TEXTS) {
-      PageNum page_num = *reinterpret_cast<PageNum *>(record_->data() + field_meta->offset());
-      if (page_num == BP_INVALID_PAGE_NUM) {
-        cell.set_null(AttrType::CHARS);
-        return RC::SUCCESS;
-      }
       cell.set_type(AttrType::CHARS);
-      DiskBufferPool* dbp = table_->data_buffer_pool();
-      Frame *frame = nullptr;
-      dbp->get_this_page(page_num, &frame);
-      cell.set_data(frame->data(), 4096);
+      int64_t offset = *(int64_t *)(record_->data() + field_meta->offset());
+      int64_t length = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
+      char *text = (char *)malloc(length);
+      rc = table_->read_text(offset, length, text);
+      if (RC::SUCCESS != rc) {
+        LOG_WARN("read text failed, rc=%d", strrc(rc));
+        return rc;
+      }
+      cell.set_data(text, length);
+      free(text);
       return RC::SUCCESS;
     }
     cell.set_type(field_meta->type());

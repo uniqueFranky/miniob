@@ -514,3 +514,69 @@ private:
   BufferPoolIterator bp_iterator_;                    ///< 遍历buffer pool的所有页面
   RecordPageHandler *record_page_handler_ = nullptr;  ///< 处理文件某页面的记录
 };
+
+class TextPageHandler
+{
+  public:
+  TextPageHandler();
+  ~TextPageHandler();
+  /*
+   * @brief 初始化
+   * @param buffer_pool 关联的 buffer pool
+   * @param page_num 当前操作的页面
+   * @param mode 当前操作的模式，可以是 READ_ONLY 或 READ_WRITE
+   */
+  RC init(DiskBufferPool &buffer_pool, PageNum page_num, ReadWriteMode mode);
+
+  /*
+   * @brief 初始化一个空页面
+   * @param buffer_pool 关联的 buffer pool
+   * @param page_num 当前操作的页面
+   * @param record_size 每个记录的大小
+   */
+  RC init_empty_page(DiskBufferPool &buffer_pool, PageNum page_num, int record_size = BP_TEXT_SLOT_SIZE);
+
+  /*
+   * @brief 清理
+   */
+  RC cleanup();
+
+  /*
+   * @brief 插入一个记录
+   * @param data 要插入的记录
+   * @param rid 返回插入的记录的标识符
+   */
+  RC insert_text(const char *data, RID *rid);
+
+  /*
+   * @brief 更新一个记录
+   * @param rid 要更新的记录的标识符
+   * @param data 新的记录数据
+   */
+  RC update_text(const RID &rid, const char *data);
+
+  /*
+   * @brief 删除一个记录
+   * @param rid 要删除的记录的标识符
+   */
+  RC delete_text(const RID *rid);
+
+  /*
+   * @brief 获取一个记录
+   * @param rid 要获取的记录的标识符
+   * @param record 返回获取的记录
+   */
+  RC get_text(const RID &rid, char *record);
+
+protected:
+  // 当前操作的 buffer pool
+  DiskBufferPool *buffer_pool_ = nullptr;
+  // 当前操作的页面
+  Frame *frame_ = nullptr;
+  // 当前操作的模式，可以是 READ_ONLY 或 READ_WRITE
+  ReadWriteMode mode_ = ReadWriteMode::READ_WRITE;
+  // 当前操作的页面头
+  PageHeader *page_header_ = nullptr;
+  // 当前页面上record分配状态信息bitmap内存起始位置
+  char *bitmap_ = nullptr;
+};

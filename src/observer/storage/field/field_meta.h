@@ -62,4 +62,6 @@ protected:
   bool     visible_;
   int      field_id_;
   bool     nullable_;
+  // Record 内部只记录 TEXT 类型的偏移量和长度
+  const static int TEXT_FIELD_LENGTH = 16;
 };

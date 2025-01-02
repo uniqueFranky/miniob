@@ -273,6 +273,10 @@ public:
 
   const char *filename() const { return file_name_.c_str(); }
 
+  // 用于 text 数据
+  RC append_data(int64_t &offset, int64_t length, const char *data);
+  RC get_data(int64_t offset, int64_t length, char *data);
+
 protected:
   RC allocate_frame(PageNum page_num, Frame **buf);
 
@@ -329,7 +333,7 @@ public:
   RC create_file(const char *file_name);
   RC open_file(LogHandler &log_handler, const char *file_name, DiskBufferPool *&bp);
   RC close_file(const char *file_name);
-
+  RC remove_file(const char *file_name);
   RC flush_page(Frame &frame);
 
   BPFrameManager    &get_frame_manager() { return frame_manager_; }

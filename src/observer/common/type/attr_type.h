@@ -22,11 +22,14 @@ enum class AttrType
   FLOATS,    ///< 浮点数类型(4字节)
   DATES,     ///< 日期类型
   BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
-  TEXTS,     ///< 文本类型
+  LONG,     ///< 长整数类型(8字节, int64_t)
+  TEXTS,     ///< 文本类型，最大 65535 字节
+  NULLS,     ///< 空值类型
   MAXTYPE,   ///< 请在 UNDEFINED 与 MAXTYPE 之间增加新类型
 };
 
 const char *attr_type_to_string(AttrType type);
 AttrType    attr_type_from_string(const char *s);
 
+static const int MAX_TEXT_LENGTH = 65535;
 struct Date_t;

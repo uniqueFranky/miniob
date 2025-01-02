@@ -27,6 +27,8 @@ Value::Value(float val) { set_float(val); }
 
 Value::Value(bool val) { set_boolean(val); }
 
+Value::Value(int64_t val) { set_boolean(val); }
+
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
 Value::Value(const Date_t &date) { set_date(date); }
@@ -150,6 +152,10 @@ void Value::set_data(char *data, int length)
       value_.date_value_ = *(Date_t *)data;
       length_ = length;
     } break;
+    case AttrType::LONG: {
+      value_.long_value_ = *(int64_t *)data;
+      length_ = length;
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -162,6 +168,13 @@ void Value::set_int(int val)
   attr_type_        = AttrType::INTS;
   value_.int_value_ = val;
   length_           = sizeof(val);
+}
+
+void Value::set_long(int64_t val)
+{
+  attr_type_ = AttrType::LONG;
+  value_.long_value_ = val;
+  length_ = sizeof(val);
 }
 
 void Value::set_float(float val)
@@ -348,6 +361,12 @@ float Value::get_float() const
     }
   }
   return 0;
+}
+
+int64_t Value::get_long() const
+{
+  ASSERT(!is_null_, "try to get long when the value is null");
+  return value_.long_value_;
 }
 
 string Value::get_string() const {

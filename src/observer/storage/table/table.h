@@ -56,6 +56,12 @@ public:
       span<const AttrInfoSqlNode> attributes, StorageFormat storage_format);
 
   /**
+   * 删除一个表
+   * @param base_dir 表所在的文件夹，表记录数据文件、索引数据文件存放位置
+   */
+  RC drop(const char *base_dir);
+
+  /**
    * 打开一个表
    * @param meta_file 保存表元数据的文件完整路径
    * @param base_dir 表所在的文件夹，表记录数据文件、索引数据文件存放位置
@@ -101,6 +107,9 @@ public:
    */
   RC visit_record(const RID &rid, function<bool(Record &)> visitor);
 
+  RC write_text(int64_t &offset, int64_t length, const char *data);
+  RC read_text(int64_t offset, int64_t length, char *data) const;
+
 public:
   int32_t     table_id() const { return table_meta_.table_id(); }
   const char *name() const;
@@ -120,7 +129,7 @@ private:
 
 private:
   RC init_record_handler(const char *base_dir);
-
+  RC init_text_handler(const char *base_dir);
 public:
   Index *find_index(const char *index_name) const;
   Index *find_index_by_field(const char *field_name) const;
@@ -130,6 +139,7 @@ private:
   string             base_dir_;
   TableMeta          table_meta_;
   DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
+  DiskBufferPool    *text_buffer_pool_ = nullptr;  /// 文本数据文件关联的buffer pool
   RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
   vector<Index *>    indexes_;
 };

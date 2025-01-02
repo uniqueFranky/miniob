@@ -90,7 +90,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       return rc;
     }
 
-    field_offset += attr_info.length;
+    field_offset += fields_[i + trx_field_num].len();
   }
 
   record_size_ = field_offset;

@@ -43,6 +43,11 @@ Table::~Table()
     data_buffer_pool_ = nullptr;
   }
 
+  if (text_buffer_pool_ != nullptr) {
+    text_buffer_pool_->close_file();
+    text_buffer_pool_ = nullptr;
+  }
+
   for (vector<Index *>::iterator it = indexes_.begin(); it != indexes_.end(); ++it) {
     Index *index = *it;
     delete index;
@@ -123,8 +128,64 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
     return rc;
   }
 
+  // 创建文件存放 text 数据
+  bool exist_text_field = false;
+  for (const FieldMeta &field : *table_meta_.field_metas()) {
+    if (field.type() == AttrType::TEXTS) {
+      exist_text_field = true;
+      break;
+    }
+  }
+  if (exist_text_field) {
+    string text_file = table_text_file(base_dir, name);
+    rc = bpm.create_file(text_file.c_str());
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create disk buffer pool of text file. file name=%s", text_file.c_str());
+      return rc;
+    }
+    rc = init_text_handler(base_dir);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create table %s:%s due to init text handler failed.", base_dir, name);
+      return rc;
+    }
+  }
+
+  base_dir_ = base_dir;
   LOG_INFO("Successfully create table %s:%s", base_dir, name);
   return rc;
+}
+
+RC Table::drop(const char *base_dir)
+{
+  RC rc = RC::SUCCESS;
+  if ((rc = sync()) != RC::SUCCESS) {
+    LOG_ERROR("Failed to sync table %s before drop. errno=%s", name(), strrc(rc));
+    return rc;
+  }
+  record_handler_->close();
+  delete record_handler_;
+  record_handler_ = nullptr;
+
+  BufferPoolManager &bpm = db_->buffer_pool_manager();
+  // Destroy buffer pool and remove data file
+  string data_file = table_data_file(base_dir, name());
+  rc = bpm.remove_file(data_file.c_str());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to remove data file %s. errno=%s", data_file.c_str(), strrc(rc));
+    return rc;
+  }
+
+  // Destroy buffer pool and remove text file
+  if (text_buffer_pool_ != nullptr) {
+    string text_file = table_text_file(base_dir, name());
+    rc = bpm.remove_file(text_file.c_str());
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to remove text file %s. errno=%s", text_file.c_str(), strrc(rc));
+      return rc;
+    }
+  }
+
+  return RC::SUCCESS;
 }
 
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
@@ -323,35 +384,44 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     }
   }
   if (field->type() == AttrType::TEXTS) {
-    if (value.is_null()) {
-      PageNum page_num = BP_INVALID_PAGE_NUM;
-      memcpy(record_data + field->offset(), &page_num, sizeof(PageNum));
-      field->set_field_null_indicator(record_data, true); // set the null indicator byte
-      return RC::SUCCESS;
-    }
-    RC rc = RC::SUCCESS;
-    Frame *frame = nullptr;
-    if ((rc = data_buffer_pool_->allocate_page(&frame)) != RC::SUCCESS) {
-      LOG_ERROR("Failed to allocate page while storaging text. rc:%d", rc);
-      return rc;
-    }
-    
-    frame->pin();
-    LOG_DEBUG("Allocated page num:%d, pin count:%d", frame->page_num(), frame->pin_count());
-    PageNum current_page_num = frame->page_num();
-    // 对于 text 类型，record_data 中存储的是 page_num
-    memcpy(record_data + field->offset(), &current_page_num, sizeof(PageNum));
-    field->set_field_null_indicator(record_data, false); // set the null indicator byte
-
-    memcpy(frame->data(), value.data(), min(size_t(4096), data_len)); // copy the text data to the page
-
-    frame->mark_dirty();
-    frame->unpin();
+    int64_t position[2];
+    position[1] = value.length();
+    LOG_INFO("append data to text buffer pool. length=%d", position[1]);
+    text_buffer_pool_->append_data(position[0], position[1], value.data());
+    memcpy(record_data + field->offset(), position, sizeof(int64_t) * 2);
   }
   else {
     memcpy(record_data + field->offset(), value.data(), copy_len);
   }
   field->set_field_null_indicator(record_data, value.is_null()); // set the null indicator byte
+  return RC::SUCCESS;
+}
+
+RC Table::write_text(int64_t &offset, int64_t length, const char *data)
+{
+  RC rc = RC::SUCCESS;
+  rc = text_buffer_pool_->append_data(offset, length, data);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to append data to text buffer pool. rc:%d", strrc(rc));
+    offset = -1;
+    length = -1;
+    return rc;
+  }
+  return RC::SUCCESS;
+}
+
+RC Table::read_text(int64_t offset, int64_t length, char *data) const
+{
+  RC rc = RC::SUCCESS;
+  if (0 > offset || 0 > length) {
+    LOG_ERROR("Invalid offset or length. offset:%d, length:%d", offset, length);
+    return RC::INVALID_ARGUMENT;
+  }
+  rc = text_buffer_pool_->get_data(offset, length, data);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to read data from text buffer pool. rc:%d", strrc(rc));
+    return rc;
+  }
   return RC::SUCCESS;
 }
 
@@ -379,6 +449,25 @@ RC Table::init_record_handler(const char *base_dir)
   }
 
   return rc;
+}
+
+RC Table::init_text_handler(const char *base_dir)
+{
+  string text_file = table_text_file(base_dir, table_meta_.name());
+
+  bool exists = false;
+  int fd = ::open(text_file.c_str(), O_RDWR);
+  if (fd > 0) exists = true;
+  close(fd);
+  if (exists) {
+    BufferPoolManager &bpm = db_->buffer_pool_manager();
+    RC                 rc  = bpm.open_file(db_->log_handler(), text_file.c_str(), text_buffer_pool_);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", text_file.c_str(), rc, strrc(rc));
+      return rc;
+    }
+  }
+  return RC::SUCCESS;
 }
 
 RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode)

@@ -48,6 +48,7 @@ public:
   Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
 
   explicit Value(int val);
+  explicit Value(int64_t val);
   explicit Value(float val);
   explicit Value(bool val);
   explicit Value(const char *s, int len = 0);
@@ -123,7 +124,7 @@ public:
   void set_value(const Value &value);
   void set_boolean(bool val);
   void set_null(AttrType type);
-
+  void set_long(int64_t val);
   string to_string() const;
 
   int compare(const Value &other) const;
@@ -139,6 +140,7 @@ public:
    * 如果当前的类型与期望获取的类型不符，就会执行转换操作
    */
   int    get_int() const;
+  int64_t get_long() const;
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
@@ -152,7 +154,6 @@ private:
   void set_string_from_other(const Value &other);
   void set_date(const Date_t &date);
   void set_text(PageNum page_num);
-
 public:
   bool is_null() const;
 
@@ -169,6 +170,7 @@ private:
     bool    bool_value_;
     char   *pointer_value_;
     Date_t  date_value_;
+    int64_t long_value_;
     PageNum page_num_;
   } value_ = {.int_value_ = 0};
 

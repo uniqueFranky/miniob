@@ -186,6 +186,15 @@ RC Db::drop_table(const char *table_name) {
     LOG_TRACE("Data for table %s not exists.", table_name);
   }
 
+  // 删除text文件
+  string table_text_path = table_text_file(path_.c_str(), table_name);
+  if(filesystem::exists(table_text_path)) {
+    filesystem::remove(table_text_path);
+    LOG_TRACE("Removed text for table %s.", table_name);
+  } else {
+    LOG_TRACE("Text for table %s not exists.", table_name);
+  }
+
   // 删除索引
   Table *table = opened_tables_[table_name];
   for(const auto &field: *table->table_meta().field_metas()) { // 遍历所有可能的字段
@@ -199,7 +208,12 @@ RC Db::drop_table(const char *table_name) {
     }
   }
 
-  // 删除内存中已经打开的表
+  // RC rc = RC::SUCCESS;
+  // // 删除内存中已经打开的表
+  // if((rc = table->drop(path_.c_str())) != RC::SUCCESS) {
+  //   LOG_ERROR("Failed to drop table %s. errno=%s", table_name, strrc(rc));
+  //   return rc;
+  // }
   delete table;
   opened_tables_.erase(table_name);
 
