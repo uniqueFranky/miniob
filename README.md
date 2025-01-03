@@ -15,20 +15,21 @@ MiniOB 整体代码简洁，容易上手，设计了一系列由浅入深的题�
 
 # Timeline
 
-| Assignment       |Score|Pass Time| Keywords                                              |Commit ID|
-|------------------|-----|---------|-------------------------------------------------------|---------|
-| drop-table       |10|2024-09-14 18:43| Table Meta Data                                       | 4d95f5649cb680e97709e7d250a7c1f2b978f1ab  |
-| update           |10|2024-09-16 11:39| Logical/Physical Plan Generating                      | 8ae210f8a59924fa90319d930e351ffb46879b0d |
-| date             |10|2024-09-16 17:07| Parsing, Type Converting                              | 6ae90c5e41028671d31620240f9191eb7c0b67a0|
-| aggregation-func |10|2024-09-28 00:49| Parsing, Error Handling                               | 4fbac94192ec7743fc062de00b4a48b726bb7dd4|
-| insert           |10|2024-09-28 17:46| Parsing, Logical/Physical Plan Generating             | 8db8d4115778219fefee37956d8cc8ee64944f62|
-| unique           |10|2024-09-28 23:37| Metadata Serialization, Index Scanning                | 948abb52fe5e82b47310fd096575a897c7685533|
-| null             |10|2024-10-01 00:36| Storage/Record/IndexKey Format, Expression Comparison | 2a087946b710aaa9f920144580341353e1bcc5a2|
-| order-by         |10|2024-11-18 22:22| Parsing, Tuple Convertion, Sorting                    | e564028e03d9bf4ce79b9e6484f01c9fb1483ea3|
-| simple-sub-query |10|2024-11-19 16:25| Parsing, Physical Operator, Filter Statement          | 7484ede11591e517488ce73f4e48010906f92fb0|
-| group-by         |20|2024-12-24 17:38|                                                       | 7d21b81a3af89a77fe0f89085187ab503606fe44|
-
-
+| Assignment       | Author       |Score|Pass Time| Keywords                                              |Commit ID|
+|------------------|--------------|-----|---------|-------------------------------------------------------|---------|
+| drop-table       | Smokey_Days  | 10       |2024-09-14 18:43| Table Meta Data                                       | 4d95f5649cb680e97709e7d250a7c1f2b978f1ab  |
+| update           | Smokey_Days  | 10          |2024-09-16 11:39| Logical/Physical Plan Generating                      | 8ae210f8a59924fa90319d930e351ffb46879b0d |
+| date             | uniqueFranky | 10          |2024-09-16 17:07| Parsing, Type Converting                              | 6ae90c5e41028671d31620240f9191eb7c0b67a0|
+| aggregation-func | FAndromedA   | 10          |2024-09-28 00:49| Parsing, Error Handling                               | 4fbac94192ec7743fc062de00b4a48b726bb7dd4|
+| insert           | Smokey_Days  | 10          |2024-09-28 17:46| Parsing, Logical/Physical Plan Generating             | 8db8d4115778219fefee37956d8cc8ee64944f62|
+| unique           | FAndromedA   | 10          |2024-09-28 23:37| Metadata Serialization, Index Scanning                | 948abb52fe5e82b47310fd096575a897c7685533|
+| null             | uniqueFranky | 10          |2024-10-01 00:36| Storage/Record/IndexKey Format, Expression Comparison | 2a087946b710aaa9f920144580341353e1bcc5a2|
+| order-by         | uniqueFranky | 10          |2024-11-18 22:22| Parsing, Tuple Convertion, Sorting                    | e564028e03d9bf4ce79b9e6484f01c9fb1483ea3|
+| simple-sub-query | uniqueFranky | 10          |2024-11-19 16:25| Parsing, Physical Operator, Filter Statement          | 7484ede11591e517488ce73f4e48010906f92fb0|
+| group-by         | FAndromedA   | 20          |2024-12-24 17:38|                                                       | 7d21b81a3af89a77fe0f89085187ab503606fe44|
+| expression       | uniqueFranky | 20 |
+| join-tables      | FAndromedA   | 20 | | | | |
+| text             | Smokey_Days  | 20 |
 # [文档](https://oceanbase.github.io/miniob/)
 代码配套设计文档和相关代码注释已经生成文档，并通过 GitHub Pages 发布。您可以直接访问：[MiniOB GitHub Pages](https://oceanbase.github.io/miniob/).
 
