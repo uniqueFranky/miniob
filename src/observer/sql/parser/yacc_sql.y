@@ -351,6 +351,10 @@ nullable_desc:
     NULLABLE
     {
         $$ = true;
+    } 
+    | NULL_T
+    {
+        $$ = true;
     }
     | NOT_T NULL_T
     {

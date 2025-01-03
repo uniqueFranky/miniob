@@ -227,13 +227,16 @@ public:
       cell.set_type(AttrType::CHARS);
       int64_t offset = *(int64_t *)(record_->data() + field_meta->offset());
       int64_t length = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
+      // LOG_DEBUG("offset=%ld, length=%ld", offset, length);
       char *text = (char *)malloc(length);
+      LOG_DEBUG("text=%p", text);
       rc = table_->read_text(offset, length, text);
       if (RC::SUCCESS != rc) {
         LOG_WARN("read text failed, rc=%d", strrc(rc));
         return rc;
       }
-      cell.set_data(text, length);
+      cell.set_data(text, length, true);
+      LOG_DEBUG("cell_data=%s", cell.to_string().c_str());
       free(text);
       return RC::SUCCESS;
     }

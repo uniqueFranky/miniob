@@ -48,39 +48,6 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
       LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
       return RC::SCHEMA_FIELD_MISSING;
     }
-
-    // check the type of each field
-    for(int i = 0; i < field_num; i++) {
-      const FieldMeta *field_meta = table_meta.field(i + table_meta.sys_field_num());
-      const AttrType field_type = field_meta->type();
-      const AttrType value_type = item[i].attr_type();
-      if (value_type == AttrType::NULLS && field_meta->nullable()) {
-        continue;
-      }
-      if(value_type != field_type) {
-        if (field_type == AttrType::TEXTS && value_type == AttrType::CHARS) {
-          if (MAX_TEXT_LENGTH < item[i].length()) {
-            LOG_WARN("Text length is too long. field_name=%s, length=%d, max_length=%d", field_meta->name(), item[i].length(), MAX_TEXT_LENGTH);
-            return RC::INVALID_ARGUMENT;
-          }
-        } else {
-          LOG_WARN("schema mismatch. field type mismatch. field_name=%s, expected=%s, actual=%s", field_meta->name(), attr_type_to_string(field_meta->type()), attr_type_to_string(item[i].attr_type()));
-          return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-        }
-      }
-      if (field_type == AttrType::CHARS) {
-        if (item[i].length() > field_meta->len()) {
-          LOG_WARN("Text length is too long. field_name=%s, length=%d, max_length=%d",
-            field_meta->name(), item[i].length(), field_meta->len());
-          return RC::INVALID_ARGUMENT;
-        }
-        char *char_value = (char*)malloc(field_meta->len());
-        memset(char_value, 0, field_meta->len());
-        memcpy(char_value, item[i].data(), item[i].length());
-        const_cast<Value&>(item[i]).set_data(char_value, field_meta->len());
-        free(char_value);
-      }
-    }
   }
   // everything alright
   stmt = new InsertStmt(table, std::move(inserts.items));

@@ -242,6 +242,22 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     }
     indexes_.push_back(index);
   }
+  
+  // 加载 text 文件
+  bool exist_text_field = false;
+  for (const FieldMeta &field : *table_meta_.field_metas()) {
+    if (field.type() == AttrType::TEXTS) {
+      exist_text_field = true;
+      break;
+    }
+  }
+  if (exist_text_field) {
+    rc = init_text_handler(base_dir);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to open table %s:%s due to init text handler failed.", base_dir, name());
+      return rc;
+    }
+  }
 
   return rc;
 }
@@ -385,10 +401,10 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   }
   if (field->type() == AttrType::TEXTS) {
     int64_t position[2];
-    position[1] = value.length();
+    position[1] = min(4096, value.length());
     LOG_INFO("append data to text buffer pool. length=%d", position[1]);
     text_buffer_pool_->append_data(position[0], position[1], value.data());
-    memcpy(record_data + field->offset(), position, sizeof(int64_t) * 2);
+    memcpy(record_data + field->offset(), (void *)position, sizeof(int64_t) * 2);
   }
   else {
     memcpy(record_data + field->offset(), value.data(), copy_len);

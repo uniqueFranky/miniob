@@ -125,12 +125,18 @@ void Value::reset()
   is_null_   = false;
 }
 
-void Value::set_data(char *data, int length)
+void Value::set_data(char *data, int length, bool is_not_null)
 {
-  length--; // -1 for the null indicator byte
-  is_null_ = static_cast<bool>(data[length]);
-  if(is_null_) {
-    return;
+
+  if (!is_not_null) {
+    length --;  // -1 for the null indicator byte
+    is_null_ = static_cast<bool>(data[length]);
+    if(is_null_) {
+      return;
+    }
+  }
+  else {
+    is_null_ = false;
   }
   switch (attr_type_) {
     case AttrType::CHARS: {

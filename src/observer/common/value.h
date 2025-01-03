@@ -45,7 +45,7 @@ public:
 
   ~Value() { reset(); }
 
-  Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length); }
+  Value(AttrType attr_type, char *data, int length = 4) : attr_type_(attr_type) { this->set_data(data, length, true); }
 
   explicit Value(int val);
   explicit Value(int64_t val);
@@ -119,8 +119,8 @@ public:
   }
 
   void set_type(AttrType type) { this->attr_type_ = type; }
-  void set_data(char *data, int length);
-  void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
+  void set_data(char *data, int length, bool is_not_null = false);
+  void set_data(const char *data, int length, bool is_not_null = false) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
   void set_null(AttrType type);
