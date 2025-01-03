@@ -33,11 +33,11 @@ JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
 Select join_table_1.name from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
 A
 B
-JOIN_TABLE_1.NAME
+NAME
 Select join_table_2.num from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
 15
 2
-JOIN_TABLE_2.NUM
+NUM
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id inner join join_table_3 on join_table_1.id=join_table_3.id;
 1 | A | 1 | 2 | 1 | 120
 JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM | JOIN_TABLE_3.ID | JOIN_TABLE_3.NUM2
